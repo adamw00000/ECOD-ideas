@@ -215,19 +215,24 @@ from ecod_v2 import ECODv2
 from sklearn import metrics
 
 n_repeats = 10
+resampling_repeats = 10
 
-results = []
+full_results = []
+os.makedirs('results', exist_ok=True)
 
-# for num_samples in [100_000]:
-#     for dim in [10]:
-for num_samples in [100, 10_000, 100_000]:
-    for dim in [2, 10, 50]:
-        for distribution, get_data in [
-            ('Normal', sample_normal),
-            ('Exponential', sample_exponential),
-            ('Autoregressive', sample_autoregressive)
-        ]:
-            for i in range(n_repeats):
+for distribution, get_data in [
+    ('Normal', sample_normal),
+    ('Exponential', sample_exponential),
+    ('Autoregressive', sample_autoregressive)
+]:
+    results = []
+
+    # for num_samples in [100_000]:
+    #     for dim in [10]:
+    # for num_samples in [100, 10_000, 100_000]:
+    for num_samples in [100, 10_000]:
+        for dim in [2, 10, 50]:
+            for exp in range(n_repeats):
                 for baseline in [
                     'ECOD',
                     'ECODv2',
@@ -252,21 +257,46 @@ for num_samples in [100, 10_000, 100_000]:
                         elif baseline == 'Mahalanobis':
                             clf = Mahalanobis()
                         
-                        clf.fit(X_train)
-
-                        scores = clf.score_samples(X_test)
-                        auc = metrics.roc_auc_score(y_test, scores)
-
                         inlier_rate = np.mean(y_test)
 
                         for cutoff_type in [
                             'Standard', # Empirical
                             'Chi-squared',
-                            # 'Bootstrap',
-                            # 'Multisplit',
+                            'Bootstrap',
+                            'Multisplit'
                         ]:
                             if cutoff_type != 'Standard' and not 'ECOD' in baseline:
                                 continue
+                            
+                            N = len(X_train)
+                            if cutoff_type == 'Bootstrap':
+                                thresholds = []
+
+                                for i in range(resampling_repeats):
+                                    bootstrap_samples = np.random.choice(range(N), size=N, replace=True)
+                                    is_bootstrap_sample = np.isin(range(N), bootstrap_samples)
+                                    X_boot_train, X_boot_cal = X_train[is_bootstrap_sample], X_train[~is_bootstrap_sample]
+                                    
+                                    clf.fit(X_boot_train)
+                                    scores = clf.score_samples(X_boot_cal)
+
+                                    emp_quantile = np.quantile(scores, q=1 - inlier_rate)
+                                    thresholds.append(emp_quantile)                        
+                                threshold = np.mean(thresholds)
+                            elif cutoff_type == 'Multisplit':
+                                cal_scores_all = np.zeros((resampling_repeats, N - int(N/2)))
+                                for i in range(resampling_repeats):
+                                    multisplit_samples = np.random.choice(range(N), size=int(N/2), replace=False)
+                                    is_multisplit_sample = np.isin(range(N), multisplit_samples)
+                                    X_multi_train, X_multi_cal = X_train[is_multisplit_sample], X_train[~is_multisplit_sample]
+                                    
+                                    clf.fit(X_multi_train)
+                                    cal_scores = clf.score_samples(X_multi_cal)
+                                    cal_scores_all[i, :] = cal_scores
+                            
+                            clf.fit(X_train)
+                            scores = clf.score_samples(X_test)
+                            auc = metrics.roc_auc_score(y_test, scores)
 
                             if cutoff_type == 'Standard':
                                 emp_quantile = np.quantile(scores, q=1 - inlier_rate)
@@ -276,37 +306,76 @@ for num_samples in [100, 10_000, 100_000]:
                                 chi_quantile = -scipy.stats.chi2.ppf(1 - inlier_rate, 2 * d)
                                 y_pred = np.where(scores > chi_quantile, 1, 0)
                             elif cutoff_type == 'Bootstrap':
-                                pass
+                                y_pred = np.where(scores > threshold, 1, 0)
                             elif cutoff_type == 'Multisplit':
-                                pass
+                                p_vals_all = np.zeros((resampling_repeats, len(scores)))
+                                for i in range(resampling_repeats):
+                                    cal_scores = cal_scores_all[i, :]
+                                    num_smaller_cal_scores = (scores > cal_scores.reshape(-1, 1)).sum(axis=0)
+                                    p_vals = (num_smaller_cal_scores + 1) / (len(cal_scores) + 1)
+                                    p_vals_all[i, :] = p_vals
+                                p_vals = 2 * np.median(p_vals_all, axis=0)
+                                y_pred = np.where(p_vals < 0.05, 0, 1)
+                                # what should be the threshold?
                         
                             acc = metrics.accuracy_score(y_test, y_pred)
+                            pre = metrics.precision_score(y_test, y_pred)
+                            rec = metrics.recall_score(y_test, y_pred)
+                            f1 = metrics.f1_score(y_test, y_pred)
 
-                            print(f'{distribution} ({num_samples}x{dim}): {baseline}{"+PCA" if use_PCA else ""} ({cutoff_type}, {i+1}/{n_repeats})' + \
-                                f' ||| AUC: {100 * auc:3.2f}, ACC: {100 * acc:3.2f}')
+                            print(f'{distribution} ({num_samples}x{dim}): {baseline}{"+PCA" if use_PCA else ""} ({cutoff_type}, {exp+1}/{n_repeats})' + \
+                                f' ||| AUC: {100 * auc:3.2f}, ACC: {100 * acc:3.2f}, F1: {100 * f1:3.2f}')
                             results.append({
                                 'Distribution': distribution,
                                 'N': num_samples,
                                 'Dim': dim,
                                 'Method': baseline + ("+PCA" if use_PCA else ""),
                                 'Cutoff': cutoff_type,
-                                'Exp': i + 1,
+                                'Exp': exp + 1,
                                 'AUC': auc,
                                 'Accuracy': acc,
+                                'Precision': acc,
+                                'Recall': acc,
+                                'AUC': acc,
                             })
 
-df = pd.DataFrame.from_records(results)
+    df = pd.DataFrame.from_records(results)
 
-os.makedirs('results', exist_ok=True)
-
-for dist in df.Distribution.unique():
-    dist_df = df[df.Distribution == dist]
+    dist_df = df[df.Distribution == distribution]
     res_df = dist_df.groupby(['Distribution', 'N', 'Dim', 'Method', 'Cutoff'])\
-        [['AUC', 'Accuracy']] \
+        [['AUC', 'Accuracy', 'Precision', 'Recall', 'F1']] \
         .mean() \
         * 100
     display(res_df)
-    res_df.to_csv(os.path.join('results', f'v2-{dist}.csv'))
+    res_df.to_csv(os.path.join('results', f'dist-{distribution}.csv'))
 
+# Full result pivots
+df = pd.DataFrame.from_records(full_results)
+df
+(df.loc[df.Cutoff == 'Standard'] \
+    .pivot_table(values='AUC', index=['Distribution', 'N', 'Dim'], columns=['Method', 'Cutoff']) \
+    .round(4) \
+    * 100) \
+    .to_csv(os.path.join('results', f'dist-all-AUC.csv'))
+(df \
+    .pivot_table(values='Accuracy', index=['Distribution', 'N', 'Dim'], columns=['Method', 'Cutoff']) \
+    .round(4) \
+    * 100) \
+    .to_csv(os.path.join('results', f'dist-all-ACC.csv'))
+(df \
+    .pivot_table(values='F1', index=['Distribution', 'N', 'Dim'], columns=['Method', 'Cutoff']) \
+    .round(4) \
+    * 100) \
+    .to_csv(os.path.join('results', f'dist-all-F1.csv'))
+(df \
+    .pivot_table(values='Precision', index=['Distribution', 'N', 'Dim'], columns=['Method', 'Cutoff']) \
+    .round(4) \
+    * 100) \
+    .to_csv(os.path.join('results', f'dataset-all-PRE.csv'))
+(df \
+    .pivot_table(values='Recall', index=['Distribution', 'N', 'Dim'], columns=['Method', 'Cutoff']) \
+    .round(4) \
+    * 100) \
+    .to_csv(os.path.join('results', f'dataset-all-REC.csv'))
 
 # %%

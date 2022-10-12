@@ -280,4 +280,33 @@ for (dataset, format) in datasets:
     display(res_df)
     res_df.to_csv(os.path.join('results', f'dataset-v3-{format}-{dataset}.csv'))
 
+# Full result pivots
+df = pd.DataFrame.from_records(full_results)
+df
+(df.loc[df.Cutoff == 'Standard'] \
+    .pivot_table(values='AUC', index=['Dataset'], columns=['Method', 'Cutoff']) \
+    .round(4) \
+    * 100) \
+    .to_csv(os.path.join('results', f'dataset-v3-all-AUC.csv'))
+(df \
+    .pivot_table(values='Accuracy', index=['Dataset'], columns=['Method', 'Cutoff']) \
+    .round(4) \
+    * 100) \
+    .to_csv(os.path.join('results', f'dataset-v3-all-ACC.csv'))
+(df \
+    .pivot_table(values='F1', index=['Dataset'], columns=['Method', 'Cutoff']) \
+    .round(4) \
+    * 100) \
+    .to_csv(os.path.join('results', f'dataset-v3-all-F1.csv'))
+(df \
+    .pivot_table(values='Precision', index=['Dataset'], columns=['Method', 'Cutoff']) \
+    .round(4) \
+    * 100) \
+    .to_csv(os.path.join('results', f'dataset-v3-all-PRE.csv'))
+(df \
+    .pivot_table(values='Recall', index=['Dataset'], columns=['Method', 'Cutoff']) \
+    .round(4) \
+    * 100) \
+    .to_csv(os.path.join('results', f'dataset-v3-all-REC.csv'))
+
 # %%
