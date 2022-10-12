@@ -101,6 +101,7 @@ from sklearn.svm import OneClassSVM
 from sklearn.ensemble import IsolationForest
 
 n_repeats = 10
+resampling_repeats = 10
 os.makedirs('results', exist_ok=True)
 
 # datasets = [(dataset, 'mat') for dataset in occ_datasets.MAT_DATASETS] + \
@@ -140,6 +141,12 @@ datasets = [
     ('WDBC', 'arff'),
     ('WPBC', 'arff'),
 ]
+# datasets = [
+#     ('Speech', 'mat'),
+#     # ('KDDCup99', 'arff'),
+# ]
+
+full_results = []
 
 for (dataset, format) in datasets:
     results = []
@@ -153,10 +160,11 @@ for (dataset, format) in datasets:
         'IForest',
     ]:
         for use_PCA in [False, True]:
-            for i in range(n_repeats):
+            for exp in range(n_repeats):
                 # Load data
                 X, y = occ_datasets.load_dataset(dataset, format)
                 X_train, X_test, y_test = occ_datasets.split_occ_dataset(X, y, train_ratio=0.6)
+                inlier_rate = np.mean(y_test)
 
                 if use_PCA:
                     X_train, X_test, _ = PCA_by_variance(X_train, X_test, variance_threshold=0.9)
@@ -176,25 +184,49 @@ for (dataset, format) in datasets:
                 elif baseline == 'IForest':
                     clf = IsolationForest()
                 
-                try:
-                    clf.fit(X_train)
-                except:
-                    # LinAlgError("Singular matrix")
-                    continue
-
-                scores = clf.score_samples(X_test)
-                auc = metrics.roc_auc_score(y_test, scores)
-
-                inlier_rate = np.mean(y_test)
-
                 for cutoff_type in [
                     'Standard', # Empirical
                     'Chi-squared',
-                    # 'Bootstrap',
-                    # 'Multisplit',
+                    'Bootstrap',
+                    'Multisplit'
                 ]:
                     if cutoff_type != 'Standard' and not 'ECOD' in baseline:
                         continue
+                    
+                    N = len(X_train)
+                    if cutoff_type == 'Bootstrap':
+                        thresholds = []
+
+                        for i in range(resampling_repeats):
+                            bootstrap_samples = np.random.choice(range(N), size=N, replace=True)
+                            is_bootstrap_sample = np.isin(range(N), bootstrap_samples)
+                            X_boot_train, X_boot_cal = X_train[is_bootstrap_sample], X_train[~is_bootstrap_sample]
+                            
+                            clf.fit(X_boot_train)
+                            scores = clf.score_samples(X_boot_cal)
+
+                            emp_quantile = np.quantile(scores, q=1 - inlier_rate)
+                            thresholds.append(emp_quantile)                        
+                        threshold = np.mean(thresholds)
+                    elif cutoff_type == 'Multisplit':
+                        cal_scores_all = np.zeros((resampling_repeats, N - int(N/2)))
+                        for i in range(resampling_repeats):
+                            multisplit_samples = np.random.choice(range(N), size=int(N/2), replace=False)
+                            is_multisplit_sample = np.isin(range(N), multisplit_samples)
+                            X_multi_train, X_multi_cal = X_train[is_multisplit_sample], X_train[~is_multisplit_sample]
+                            
+                            clf.fit(X_multi_train)
+                            cal_scores = clf.score_samples(X_multi_cal)
+                            cal_scores_all[i, :] = cal_scores
+
+                    try:
+                        clf.fit(X_train)
+                    except:
+                        # LinAlgError("Singular matrix")
+                        continue
+
+                    scores = clf.score_samples(X_test)
+                    auc = metrics.roc_auc_score(y_test, scores)
 
                     if cutoff_type == 'Standard':
                         emp_quantile = np.quantile(scores, q=1 - inlier_rate)
@@ -204,32 +236,48 @@ for (dataset, format) in datasets:
                         chi_quantile = -scipy.stats.chi2.ppf(1 - inlier_rate, 2 * d)
                         y_pred = np.where(scores > chi_quantile, 1, 0)
                     elif cutoff_type == 'Bootstrap':
-                        pass
+                        y_pred = np.where(scores > threshold, 1, 0)
                     elif cutoff_type == 'Multisplit':
-                        pass
+                        p_vals_all = np.zeros((resampling_repeats, len(scores)))
+                        for i in range(resampling_repeats):
+                            cal_scores = cal_scores_all[i, :]
+                            num_smaller_cal_scores = (scores > cal_scores.reshape(-1, 1)).sum(axis=0)
+                            p_vals = (num_smaller_cal_scores + 1) / (len(cal_scores) + 1)
+                            p_vals_all[i, :] = p_vals
+                        p_vals = 2 * np.median(p_vals_all, axis=0)
+                        y_pred = np.where(p_vals < 0.05, 0, 1)
+                        # what should be the threshold?
                 
                     acc = metrics.accuracy_score(y_test, y_pred)
+                    pre = metrics.precision_score(y_test, y_pred)
+                    rec = metrics.recall_score(y_test, y_pred)
+                    f1 = metrics.f1_score(y_test, y_pred)
 
-                    print(f'{dataset}: {baseline}{"+PCA" if use_PCA else ""} ({cutoff_type}, {i+1}/{n_repeats})' + \
-                        f' ||| AUC: {100 * auc:3.2f}, ACC: {100 * acc:3.2f}')
-                    results.append({
+                    print(f'{dataset}: {baseline}{"+PCA" if use_PCA else ""} ({cutoff_type}, {exp+1}/{n_repeats})' + \
+                        f' ||| AUC: {100 * auc:3.2f}, ACC: {100 * acc:3.2f}, F1: {100 * f1:3.2f}')
+                    occ_metrics = {
                         'Dataset': dataset,
                         'Method': baseline + ("+PCA" if use_PCA else ""),
                         'Cutoff': cutoff_type,
-                        'Exp': i + 1,
+                        'Exp': exp + 1,
                         'AUC': auc,
                         'Accuracy': acc,
-                    })
+                        'Precision': pre,
+                        'Recall': rec,
+                        'F1': f1,
+                    }
+                    results.append(occ_metrics)
+                    full_results.append(occ_metrics)
     
     df = pd.DataFrame.from_records(results)
 
     dataset_df = df[df.Dataset == dataset]
     res_df = dataset_df.groupby(['Dataset', 'Method', 'Cutoff'])\
-        [['AUC', 'Accuracy']] \
+        [['AUC', 'Accuracy', 'Precision', 'Recall', 'F1']] \
         .mean() \
         .round(4) \
         * 100
     display(res_df)
-    res_df.to_csv(os.path.join('results', f'dataset-v2-{format}-{dataset}.csv'))
+    res_df.to_csv(os.path.join('results', f'dataset-v3-{format}-{dataset}.csv'))
 
 # %%
