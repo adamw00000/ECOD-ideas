@@ -238,10 +238,10 @@ for num_samples in [100, 10_000, 100_000]:
                         if use_PCA and not 'ECOD' in baseline:
                             continue
 
-                        train_samples, test_samples, test_labels = get_data(num_samples, dim)
+                        X_train, X_test, y_test = get_data(num_samples, dim)
 
                         if use_PCA:
-                            train_samples, test_samples, _ = PCA_by_variance(train_samples, test_samples, variance_threshold=0.5)
+                            X_train, X_test, _ = PCA_by_variance(X_train, X_test, variance_threshold=0.5)
 
                         if baseline == 'ECOD':
                             clf = PyODWrapper(ECOD())
@@ -252,12 +252,12 @@ for num_samples in [100, 10_000, 100_000]:
                         elif baseline == 'Mahalanobis':
                             clf = Mahalanobis()
                         
-                        clf.fit(train_samples)
+                        clf.fit(X_train)
 
-                        scores = clf.score_samples(test_samples)
-                        auc = metrics.roc_auc_score(test_labels, scores)
+                        scores = clf.score_samples(X_test)
+                        auc = metrics.roc_auc_score(y_test, scores)
 
-                        inlier_rate = np.mean(test_labels)
+                        inlier_rate = np.mean(y_test)
 
                         for cutoff_type in [
                             'Standard', # Empirical
@@ -272,7 +272,7 @@ for num_samples in [100, 10_000, 100_000]:
                                 emp_quantile = np.quantile(scores, q=1 - inlier_rate)
                                 y_pred = np.where(scores > emp_quantile, 1, 0)
                             elif cutoff_type == 'Chi-squared':
-                                d = test_samples.shape[1]
+                                d = X_test.shape[1]
                                 chi_quantile = -scipy.stats.chi2.ppf(1 - inlier_rate, 2 * d)
                                 y_pred = np.where(scores > chi_quantile, 1, 0)
                             elif cutoff_type == 'Bootstrap':
@@ -280,7 +280,7 @@ for num_samples in [100, 10_000, 100_000]:
                             elif cutoff_type == 'Multisplit':
                                 pass
                         
-                            acc = metrics.accuracy_score(test_labels, y_pred)
+                            acc = metrics.accuracy_score(y_test, y_pred)
 
                             print(f'{distribution} ({num_samples}x{dim}): {baseline}{"+PCA" if use_PCA else ""} ({cutoff_type}, {i+1}/{n_repeats})' + \
                                 f' ||| AUC: {100 * auc:3.2f}, ACC: {100 * acc:3.2f}')
