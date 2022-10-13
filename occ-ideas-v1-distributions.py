@@ -334,9 +334,9 @@ for distribution, get_data in [
                                 'Exp': exp + 1,
                                 'AUC': auc,
                                 'Accuracy': acc,
-                                'Precision': acc,
-                                'Recall': acc,
-                                'AUC': acc,
+                                'Precision': pre,
+                                'Recall': rec,
+                                'F1': f1,
                             })
 
     df = pd.DataFrame.from_records(results)

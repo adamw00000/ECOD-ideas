@@ -253,10 +253,10 @@ for (dataset, format) in datasets:
                     rec = metrics.recall_score(y_test, y_pred)
                     f1 = metrics.f1_score(y_test, y_pred)
 
-                    print(f'{dataset}: {baseline}{"+PCA" if use_PCA else ""} ({cutoff_type}, {exp+1}/{n_repeats})' + \
+                    print(f'{dataset}.{format}: {baseline}{"+PCA" if use_PCA else ""} ({cutoff_type}, {exp+1}/{n_repeats})' + \
                         f' ||| AUC: {100 * auc:3.2f}, ACC: {100 * acc:3.2f}, F1: {100 * f1:3.2f}')
                     occ_metrics = {
-                        'Dataset': dataset,
+                        'Dataset': f'{dataset} ({format})',
                         'Method': baseline + ("+PCA" if use_PCA else ""),
                         'Cutoff': cutoff_type,
                         'Exp': exp + 1,
