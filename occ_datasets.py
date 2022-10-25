@@ -98,7 +98,7 @@ def load_dataset(name, format):
 
 def split_occ_dataset(X, y, train_ratio=0.6):
     idx_pos = np.where(y == 1)[0]
-    idx_train = np.random.choice(idx_pos, int(train_ratio * len(idx_pos)))
+    idx_train = np.random.choice(idx_pos, int(train_ratio * len(idx_pos)), replace=False)
 
     idx_test = np.ones_like(y, dtype=np.bool) # array of True
     idx_test[idx_train] = False

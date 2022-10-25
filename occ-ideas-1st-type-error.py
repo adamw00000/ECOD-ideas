@@ -112,9 +112,12 @@ from ecod_v2_min import ECODv2Min
 from sklearn.svm import OneClassSVM
 from sklearn.ensemble import IsolationForest
 
+alpha = 0.05
 n_repeats = 10
 resampling_repeats = 10
-os.makedirs('results', exist_ok=True)
+
+RESULTS_DIR = f'results_fnr_{alpha:.2f}'
+os.makedirs(RESULTS_DIR, exist_ok=True)
 
 # datasets = [(dataset, 'mat') for dataset in occ_datasets.MAT_DATASETS] + \
 #     [(dataset, 'arff') for dataset in occ_datasets.ARFF_DATASETS]
@@ -167,16 +170,20 @@ for (dataset, format) in datasets:
         # Load data
         X, y = occ_datasets.load_dataset(dataset, format)
         X_train, X_test, y_test = occ_datasets.split_occ_dataset(X, y, train_ratio=0.6)
-        inlier_rate = np.mean(y_test)
+
+        # include only inliers
+        inliers = np.where(y_test == 1)[0]
+        y_test = y_test[inliers]
+        X_test = X_test[inliers, :]
 
         for baseline in [
-            'ECOD',
+            # 'ECOD',
             'ECODv2',
-            'ECODv2Min',
-            'GeomMedian',
-            'Mahalanobis',
-            'OC-SVM',
-            'IForest',
+            # 'ECODv2Min',
+            # 'GeomMedian',
+            # 'Mahalanobis',
+            # 'OC-SVM',
+            # 'IForest',
         ]:
             for pca_variance_threshold in [0.5, 0.9, None]:
                 if pca_variance_threshold is not None:
@@ -200,66 +207,48 @@ for (dataset, format) in datasets:
                     clf = IsolationForest()
                 
                 for cutoff_type in [
-                    'Empirical',
-                    'Chi-squared',
-                    'Bootstrap',
                     'Multisplit'
                 ]:
                     if cutoff_type != 'Empirical' and not 'ECODv2' in baseline:
                         continue
                     
                     N = len(X_train)
-                    if cutoff_type == 'Bootstrap' or cutoff_type == 'Multisplit':
-                        thresholds = []
-
+                    if cutoff_type == 'Multisplit':
+                        cal_scores_all = np.zeros((resampling_repeats, N - int(N/2)))
                         for i in range(resampling_repeats):
-                            if cutoff_type == 'Bootstrap':
-                                resampling_samples = np.random.choice(range(N), size=N, replace=True)
-                            else:
-                                # Multisplit
-                                resampling_samples = np.random.choice(range(N), size=int(N/2), replace=False)
-                            is_selected_sample = np.isin(range(N), resampling_samples)
-                            X_resampling_train, X_resampling_cal = X_train[is_selected_sample], X_train[~is_selected_sample]
+                            multisplit_samples = np.random.choice(range(N), size=int(N/2), replace=False)
+                            is_multisplit_sample = np.isin(range(N), multisplit_samples)
+                            X_multi_train, X_multi_cal = X_train[is_multisplit_sample], X_train[~is_multisplit_sample]
                             
-                            clf.fit(X_resampling_train)
-                            scores = clf.score_samples(X_resampling_cal)
-
-                            emp_quantile = np.quantile(scores, q=1 - inlier_rate)
-                            thresholds.append(emp_quantile)                        
-                        resampling_threshold = np.mean(thresholds)
+                            clf.fit(X_multi_train)
+                            cal_scores = clf.score_samples(X_multi_cal)
+                            cal_scores_all[i, :] = cal_scores
 
                     clf.fit(X_train)
 
                     scores = clf.score_samples(X_test)
-                    auc = metrics.roc_auc_score(y_test, scores)
 
-                    if cutoff_type == 'Empirical':
-                        emp_quantile = np.quantile(scores, q=1 - inlier_rate)
-                        y_pred = np.where(scores > emp_quantile, 1, 0)
-                    elif cutoff_type == 'Chi-squared':
-                        d = X_test.shape[1]
-                        chi_quantile = -scipy.stats.chi2.ppf(1 - inlier_rate, 2 * d)
-                        y_pred = np.where(scores > chi_quantile, 1, 0)
-                    elif cutoff_type == 'Bootstrap' or cutoff_type == 'Multisplit':
-                        y_pred = np.where(scores > resampling_threshold, 1, 0)
+                    if cutoff_type == 'Multisplit':
+                        p_vals_all = np.zeros((resampling_repeats, len(scores)))
+                        for i in range(resampling_repeats):
+                            cal_scores = cal_scores_all[i, :]
+                            num_smaller_cal_scores = (scores > cal_scores.reshape(-1, 1)).sum(axis=0)
+                            p_vals = (num_smaller_cal_scores + 1) / (len(cal_scores) + 1)
+                            p_vals_all[i, :] = p_vals
+                        p_vals = 2 * np.median(p_vals_all, axis=0)
+                        y_pred = np.where(p_vals < alpha, 0, 1)
                 
-                    acc = metrics.accuracy_score(y_test, y_pred)
-                    pre = metrics.precision_score(y_test, y_pred)
-                    rec = metrics.recall_score(y_test, y_pred)
-                    f1 = metrics.f1_score(y_test, y_pred)
+                    fnr = 1 - np.mean(y_pred == y_test) # False Negative Rate
 
                     print(f'{dataset}.{format}: {baseline}{f"+PCA{pca_variance_threshold:.1f}" if pca_variance_threshold is not None else ""} ({cutoff_type}, {exp+1}/{n_repeats})' + \
-                        f' ||| AUC: {100 * auc:3.2f}, ACC: {100 * acc:3.2f}, F1: {100 * f1:3.2f}')
+                        f' ||| FNR: {fnr:.3f}')
                     occ_metrics = {
                         'Dataset': f'({format}) {dataset}',
                         'Method': baseline + (f"+PCA{pca_variance_threshold:.1f}" if pca_variance_threshold is not None else ""),
                         'Cutoff': cutoff_type,
                         'Exp': exp + 1,
-                        'AUC': auc,
-                        'ACC': acc,
-                        'PRE': pre,
-                        'REC': rec,
-                        'F1': f1,
+                        'alpha': alpha,
+                        'FNR': fnr,
                     }
                     results.append(occ_metrics)
                     full_results.append(occ_metrics)
@@ -267,27 +256,34 @@ for (dataset, format) in datasets:
     df = pd.DataFrame.from_records(results)
 
     dataset_df = df[df.Dataset == f'({format}) {dataset}']
-    res_df = dataset_df.groupby(['Dataset', 'Method', 'Cutoff'])\
-        [['AUC', 'ACC', 'PRE', 'REC', 'F1']] \
+    res_df = dataset_df.groupby(['Dataset', 'Method', 'Cutoff', 'alpha'])\
+        [['FNR']] \
         .mean() \
-        .round(4) \
-        * 100
+        .round(3)
     display(res_df)
-    res_df.to_csv(os.path.join('results', f'dataset-v4-{format}-{dataset}.csv'))
+    res_df.to_csv(os.path.join(RESULTS_DIR, f'dataset-{format}-{dataset}.csv'))
 
 # Full result pivots
 df = pd.DataFrame.from_records(full_results)
 df
 
-for metric in ['AUC', 'ACC', 'F1', 'PRE', 'REC']:
+pivots = {}
+for metric in ['FNR', 'alpha']:
     metric_df = df
-    if metric == 'AUC':
-        metric_df = df.loc[df.Cutoff == 'Empirical']
     
-    (metric_df \
+    pivot = metric_df \
         .pivot_table(values=metric, index=['Dataset'], columns=['Method', 'Cutoff']) \
-        * 100) \
-        .round(2) \
-        .to_csv(os.path.join('results', f'dataset-v4-all-{metric}.csv'))
+        * 1
+    
+    pivots[metric] = pivot
+
+    if metric in ['alpha']:
+        continue
+    
+    pivot \
+        .round(3) \
+        .to_csv(os.path.join(RESULTS_DIR, f'dataset-all-{metric}.csv'))
+
+(pivots['FNR'] < pivots['alpha']).to_csv(os.path.join(RESULTS_DIR, f'dataset-all-FNR-alpha.csv'))
 
 # %%

@@ -169,15 +169,15 @@ for dataset in datasets.DATASET_NAMES:
                 inlier_rate = np.mean(y_test)
 
                 for cutoff_type in [
-                    'Standard', # Empirical
+                    'Empirical',
                     'Chi-squared',
                     # 'Bootstrap',
                     # 'Multisplit',
                 ]:
-                    if cutoff_type != 'Standard' and not 'ECOD' in baseline:
+                    if cutoff_type != 'Empirical' and not 'ECOD' in baseline:
                         continue
 
-                    if cutoff_type == 'Standard':
+                    if cutoff_type == 'Empirical':
                         emp_quantile = np.quantile(scores, q=1 - inlier_rate)
                         y_pred = np.where(scores > emp_quantile, 1, 0)
                     elif cutoff_type == 'Chi-squared':

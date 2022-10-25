@@ -260,12 +260,12 @@ for distribution, get_data in [
                         inlier_rate = np.mean(y_test)
 
                         for cutoff_type in [
-                            'Standard', # Empirical
+                            'Empirical',
                             'Chi-squared',
                             'Bootstrap',
                             'Multisplit'
                         ]:
-                            if cutoff_type != 'Standard' and not 'ECOD' in baseline:
+                            if cutoff_type != 'Empirical' and not 'ECOD' in baseline:
                                 continue
                             
                             N = len(X_train)
@@ -298,7 +298,7 @@ for distribution, get_data in [
                             scores = clf.score_samples(X_test)
                             auc = metrics.roc_auc_score(y_test, scores)
 
-                            if cutoff_type == 'Standard':
+                            if cutoff_type == 'Empirical':
                                 emp_quantile = np.quantile(scores, q=1 - inlier_rate)
                                 y_pred = np.where(scores > emp_quantile, 1, 0)
                             elif cutoff_type == 'Chi-squared':
@@ -352,7 +352,7 @@ for distribution, get_data in [
 # Full result pivots
 df = pd.DataFrame.from_records(full_results)
 df
-(df.loc[df.Cutoff == 'Standard'] \
+(df.loc[df.Cutoff == 'Empirical'] \
     .pivot_table(values='AUC', index=['Distribution', 'N', 'Dim'], columns=['Method', 'Cutoff']) \
     .round(4) \
     * 100) \
