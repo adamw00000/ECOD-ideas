@@ -163,7 +163,18 @@ def dot_diag(A, B):
 class Mahalanobis():
     def fit(self, X):
         self.mu = np.mean(X, axis=0).reshape(1, -1)
-        self.sigma_inv = np.linalg.inv(np.cov(X.T))
+
+        if X.shape[1] != 1:
+            # sometimes non invertible
+            # self.sigma_inv = np.linalg.inv(np.cov(X.T))
+
+            # use pseudoinverse
+            self.sigma_inv = np.linalg.pinv(np.cov(X.T))
+            # another idea: add small number to diagonal
+            # self.sigma_inv = np.linalg.inv(np.cov(X.T) + EPS * np.eye(X.shape[1]))
+        else:
+            self.sigma_inv = np.eye(1)
+            
         return self
     
     def score_samples(self, X):
@@ -207,18 +218,29 @@ plt.show()
 
 # %%
 import os
+import occ_datasets
 import scipy.stats
+import numpy as np
 import pandas as pd
+import matplotlib.pyplot as plt
+from sklearn import metrics
+from IPython.display import display
 
 from pyod.models.ecod import ECOD
 from ecod_v2 import ECODv2
-from sklearn import metrics
+from ecod_v2_min import ECODv2Min
+from sklearn.svm import OneClassSVM
+from sklearn.ensemble import IsolationForest
 
+alpha = 0.25
 n_repeats = 10
 resampling_repeats = 10
 
+# RESULTS_DIR = 'results_fdr'
+RESULTS_DIR = f'resultsdist_fdr_{alpha:.2f}'
+os.makedirs(RESULTS_DIR, exist_ok=True)
+
 full_results = []
-os.makedirs('results', exist_ok=True)
 
 for distribution, get_data in [
     ('Normal', sample_normal),
@@ -227,87 +249,78 @@ for distribution, get_data in [
 ]:
     results = []
 
-    # for num_samples in [100_000]:
-    #     for dim in [10]:
-    # for num_samples in [100, 10_000, 100_000]:
     for num_samples in [100, 10_000]:
         for dim in [2, 10, 50]:
             for exp in range(n_repeats):
+                # Load data
+                X_train, X_test, y_test = get_data(num_samples, dim)
+                inlier_rate = np.mean(y_test)
+
                 for baseline in [
-                    'ECOD',
+                    # 'ECOD',
                     'ECODv2',
-                    'GeomMedian',
-                    'Mahalanobis',
+                    # 'ECODv2Min',
+                    # 'GeomMedian',
+                    # 'Mahalanobis',
+                    # 'OC-SVM',
+                    # 'IForest',
                 ]:
-                    for use_PCA in [False, True]:
-                        if use_PCA and not 'ECOD' in baseline:
-                            continue
-
-                        X_train, X_test, y_test = get_data(num_samples, dim)
-
-                        if use_PCA:
-                            X_train, X_test, _ = PCA_by_variance(X_train, X_test, variance_threshold=0.5)
+                    # for pca_variance_threshold in [0.5, 0.9, None]:
+                    for pca_variance_threshold in [None]:
+                        if pca_variance_threshold is not None:
+                            if not 'ECODv2' in baseline:
+                                continue
+                            X_train, X_test, _ = PCA_by_variance(X_train, X_test, pca_variance_threshold)
 
                         if baseline == 'ECOD':
                             clf = PyODWrapper(ECOD())
                         elif baseline == 'ECODv2':
                             clf = PyODWrapper(ECODv2())
+                        elif baseline == 'ECODv2Min':
+                            clf = PyODWrapper(ECODv2Min())
                         elif baseline == 'GeomMedian':
                             clf = GeomMedianDistance()
                         elif baseline == 'Mahalanobis':
                             clf = Mahalanobis()
+                        elif baseline == 'OC-SVM':
+                            clf = OneClassSVM()
+                        elif baseline == 'IForest':
+                            clf = IsolationForest()
                         
-                        inlier_rate = np.mean(y_test)
-
                         for cutoff_type in [
                             'Empirical',
-                            'Chi-squared',
-                            'Bootstrap',
-                            'Multisplit'
+                            # 'Chi-squared',
+                            # 'Bootstrap',
+                            'Multisplit',
+                            'Multisplit+BH',
+                            'Multisplit+BH+pi',
                         ]:
-                            if cutoff_type != 'Empirical' and not 'ECOD' in baseline:
+                            if cutoff_type != 'Empirical' and not 'ECODv2' in baseline:
                                 continue
                             
                             N = len(X_train)
-                            if cutoff_type == 'Bootstrap':
-                                thresholds = []
-
-                                for i in range(resampling_repeats):
-                                    bootstrap_samples = np.random.choice(range(N), size=N, replace=True)
-                                    is_bootstrap_sample = np.isin(range(N), bootstrap_samples)
-                                    X_boot_train, X_boot_cal = X_train[is_bootstrap_sample], X_train[~is_bootstrap_sample]
-                                    
-                                    clf.fit(X_boot_train)
-                                    scores = clf.score_samples(X_boot_cal)
-
-                                    emp_quantile = np.quantile(scores, q=1 - inlier_rate)
-                                    thresholds.append(emp_quantile)                        
-                                threshold = np.mean(thresholds)
-                            elif cutoff_type == 'Multisplit':
+                            if cutoff_type == 'Multisplit':
                                 cal_scores_all = np.zeros((resampling_repeats, N - int(N/2)))
+
                                 for i in range(resampling_repeats):
-                                    multisplit_samples = np.random.choice(range(N), size=int(N/2), replace=False)
-                                    is_multisplit_sample = np.isin(range(N), multisplit_samples)
-                                    X_multi_train, X_multi_cal = X_train[is_multisplit_sample], X_train[~is_multisplit_sample]
+                                    resampling_samples = np.random.choice(range(N), size=int(N/2), replace=False)
+                                    is_selected_sample = np.isin(range(N), resampling_samples)
+                                    X_resampling_train, X_resampling_cal = X_train[is_selected_sample], X_train[~is_selected_sample]
                                     
-                                    clf.fit(X_multi_train)
-                                    cal_scores = clf.score_samples(X_multi_cal)
+                                    clf.fit(X_resampling_train)
+                                    cal_scores = clf.score_samples(X_resampling_cal)
                                     cal_scores_all[i, :] = cal_scores
-                            
+
                             clf.fit(X_train)
+
                             scores = clf.score_samples(X_test)
                             auc = metrics.roc_auc_score(y_test, scores)
+
 
                             if cutoff_type == 'Empirical':
                                 emp_quantile = np.quantile(scores, q=1 - inlier_rate)
                                 y_pred = np.where(scores > emp_quantile, 1, 0)
-                            elif cutoff_type == 'Chi-squared':
-                                d = X_test.shape[1]
-                                chi_quantile = -scipy.stats.chi2.ppf(1 - inlier_rate, 2 * d)
-                                y_pred = np.where(scores > chi_quantile, 1, 0)
-                            elif cutoff_type == 'Bootstrap':
-                                y_pred = np.where(scores > threshold, 1, 0)
-                            elif cutoff_type == 'Multisplit':
+                            elif 'Multisplit' in cutoff_type:
                                 p_vals_all = np.zeros((resampling_repeats, len(scores)))
                                 for i in range(resampling_repeats):
                                     cal_scores = cal_scores_all[i, :]
@@ -315,67 +328,104 @@ for distribution, get_data in [
                                     p_vals = (num_smaller_cal_scores + 1) / (len(cal_scores) + 1)
                                     p_vals_all[i, :] = p_vals
                                 p_vals = 2 * np.median(p_vals_all, axis=0)
-                                y_pred = np.where(p_vals < 0.05, 0, 1)
-                                # what should be the threshold?
-                        
+                                y_pred = np.where(p_vals < alpha, 0, 1)
+
+                                if 'BH' in cutoff_type:
+                                    fdr_ctl_threshold = alpha
+                                    if 'pi' in cutoff_type:
+                                        pi = inlier_rate
+                                        fdr_ctl_threshold = alpha / pi
+                                    
+                                    sorted_indices = np.argsort(p_vals)
+                                    bh_thresholds = np.linspace(
+                                        fdr_ctl_threshold / len(p_vals), fdr_ctl_threshold, len(p_vals))
+                                    
+                                    # is_h0_rejected == is_outlier, H_0: X ~ P_X
+                                    # OLD WAY
+                                    is_h0_rejected = p_vals[sorted_indices] < bh_thresholds
+                                    # NEW WAY
+                                    rejections = np.where(is_h0_rejected)[0]
+                                    if len(rejections) > 0:
+                                        is_h0_rejected[:(np.max(rejections) + 1)] = True
+                                    # take all the point to the left of last discovery
+
+                                    y_pred = np.ones_like(p_vals)
+                                    y_pred[sorted_indices[is_h0_rejected]] = 0
+
+                            false_detections = np.sum((y_pred == 0) & (y_test == 1))
+                            detections = np.sum(y_pred == 0)
+                            fdr = false_detections / detections
+
                             acc = metrics.accuracy_score(y_test, y_pred)
                             pre = metrics.precision_score(y_test, y_pred)
                             rec = metrics.recall_score(y_test, y_pred)
                             f1 = metrics.f1_score(y_test, y_pred)
 
-                            print(f'{distribution} ({num_samples}x{dim}): {baseline}{"+PCA" if use_PCA else ""} ({cutoff_type}, {exp+1}/{n_repeats})' + \
-                                f' ||| AUC: {100 * auc:3.2f}, ACC: {100 * acc:3.2f}, F1: {100 * f1:3.2f}')
-                            results.append({
+                            print(f'{distribution} ({num_samples}x{dim}): {baseline}{f"+PCA{pca_variance_threshold:.1f}" if pca_variance_threshold is not None else ""} ({cutoff_type}, {exp+1}/{n_repeats})' + \
+                                f' ||| AUC: {100 * auc:3.2f}, ACC: {100 * acc:3.2f}, F1: {100 * f1:3.2f}, FDR: {fdr:.3f}')
+                            occ_metrics = {
                                 'Distribution': distribution,
                                 'N': num_samples,
                                 'Dim': dim,
-                                'Method': baseline + ("+PCA" if use_PCA else ""),
+                                'Method': baseline + (f"+PCA{pca_variance_threshold:.1f}" if pca_variance_threshold is not None else ""),
                                 'Cutoff': cutoff_type,
                                 'Exp': exp + 1,
                                 'AUC': auc,
-                                'Accuracy': acc,
-                                'Precision': pre,
-                                'Recall': rec,
+                                'ACC': acc,
+                                'PRE': pre,
+                                'REC': rec,
                                 'F1': f1,
-                            })
-
+                                'FDR': fdr,
+                                'alpha': alpha,
+                                'pi * alpha': alpha * inlier_rate,
+                                '#': len(y_pred),
+                                '#FD': false_detections,
+                                '#D': detections,
+                            }
+                            results.append(occ_metrics)
+                            full_results.append(occ_metrics)
+            
     df = pd.DataFrame.from_records(results)
 
     dist_df = df[df.Distribution == distribution]
-    res_df = dist_df.groupby(['Distribution', 'N', 'Dim', 'Method', 'Cutoff'])\
-        [['AUC', 'Accuracy', 'Precision', 'Recall', 'F1']] \
-        .mean() \
-        * 100
+    res_df = dist_df.groupby(['Distribution', 'N', 'Dim', 'Method', 'Cutoff', 'alpha'])\
+        [['pi * alpha', 'AUC', 'ACC', 'PRE', 'REC', 'F1', '#', '#FD', '#D', 'FDR']] \
+        .mean()
+
+    res_df[['AUC', 'ACC', 'PRE', 'REC', 'F1']] = (res_df[['AUC', 'ACC', 'PRE', 'REC', 'F1']] * 100) \
+        .applymap('{0:.2f}'.format)
+    res_df[['#FD', '#D']] = (res_df[['#FD', '#D']]) \
+        .applymap('{0:.1f}'.format)
+    res_df['FDR < alpha'] = res_df['FDR'] < res_df.index.get_level_values('alpha')
+    res_df['FDR < pi * alpha'] = (res_df['FDR'] < res_df['pi * alpha'])
+    res_df[['FDR', 'pi * alpha']] = res_df[['FDR', 'pi * alpha']].applymap('{0:.3f}'.format)
+
     display(res_df)
-    res_df.to_csv(os.path.join('results', f'dist-{distribution}.csv'))
+    res_df.to_csv(os.path.join(RESULTS_DIR, f'dist-{distribution}.csv'))
 
 # Full result pivots
 df = pd.DataFrame.from_records(full_results)
 df
-(df.loc[df.Cutoff == 'Empirical'] \
-    .pivot_table(values='AUC', index=['Distribution', 'N', 'Dim'], columns=['Method', 'Cutoff']) \
-    .round(4) \
-    * 100) \
-    .to_csv(os.path.join('results', f'dist-all-AUC.csv'))
-(df \
-    .pivot_table(values='Accuracy', index=['Distribution', 'N', 'Dim'], columns=['Method', 'Cutoff']) \
-    .round(4) \
-    * 100) \
-    .to_csv(os.path.join('results', f'dist-all-ACC.csv'))
-(df \
-    .pivot_table(values='F1', index=['Distribution', 'N', 'Dim'], columns=['Method', 'Cutoff']) \
-    .round(4) \
-    * 100) \
-    .to_csv(os.path.join('results', f'dist-all-F1.csv'))
-(df \
-    .pivot_table(values='Precision', index=['Distribution', 'N', 'Dim'], columns=['Method', 'Cutoff']) \
-    .round(4) \
-    * 100) \
-    .to_csv(os.path.join('results', f'dataset-all-PRE.csv'))
-(df \
-    .pivot_table(values='Recall', index=['Distribution', 'N', 'Dim'], columns=['Method', 'Cutoff']) \
-    .round(4) \
-    * 100) \
-    .to_csv(os.path.join('results', f'dataset-all-REC.csv'))
+
+pivots = {}
+for metric in ['AUC', 'ACC', 'F1', 'PRE', 'REC', 'FDR', 'alpha', 'pi * alpha']:
+    metric_df = df
+    if metric == 'AUC':
+        metric_df = df.loc[df.Cutoff == 'Empirical']
+    
+    pivot = metric_df \
+        .pivot_table(values=metric, index=['Distribution', 'N', 'Dim'], columns=['Method', 'Cutoff']) \
+        * (100 if metric not in ['FDR', 'alpha', 'pi * alpha'] else 1)
+
+    pivots[metric] = pivot
+    if metric in ['alpha', 'pi * alpha']:
+        continue
+
+    pivot \
+        .applymap("{0:.2f}".format if metric != 'FDR' else "{0:.3f}".format ) \
+        .to_csv(os.path.join(RESULTS_DIR, f'dist-all-{metric}.csv'))
+
+(pivots['FDR'] < pivots['alpha']).to_csv(os.path.join(RESULTS_DIR, f'dist-all-FDR-alpha.csv'))
+(pivots['FDR'] < pivots['pi * alpha']).to_csv(os.path.join(RESULTS_DIR, f'dist-all-FDR-pi-alpha.csv'))
 
 # %%

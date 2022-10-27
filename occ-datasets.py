@@ -243,6 +243,10 @@ for (dataset, format) in datasets:
                     elif cutoff_type == 'Bootstrap' or cutoff_type == 'Multisplit':
                         y_pred = np.where(scores > resampling_threshold, 1, 0)
                 
+                    false_detections = np.sum((y_pred == 0) & (y_test == 1))
+                    detections = np.sum(y_pred == 0)
+                    fdr = false_detections / detections
+
                     acc = metrics.accuracy_score(y_test, y_pred)
                     pre = metrics.precision_score(y_test, y_pred)
                     rec = metrics.recall_score(y_test, y_pred)
@@ -260,6 +264,7 @@ for (dataset, format) in datasets:
                         'PRE': pre,
                         'REC': rec,
                         'F1': f1,
+                        'FDR': fdr,
                     }
                     results.append(occ_metrics)
                     full_results.append(occ_metrics)
@@ -268,18 +273,18 @@ for (dataset, format) in datasets:
 
     dataset_df = df[df.Dataset == f'({format}) {dataset}']
     res_df = dataset_df.groupby(['Dataset', 'Method', 'Cutoff'])\
-        [['AUC', 'ACC', 'PRE', 'REC', 'F1']] \
+        [['AUC', 'ACC', 'PRE', 'REC', 'F1', 'FDR']] \
         .mean() \
         .round(4) \
         * 100
     display(res_df)
-    res_df.to_csv(os.path.join('results', f'dataset-v4-{format}-{dataset}.csv'))
+    res_df.to_csv(os.path.join('results', f'dataset-{format}-{dataset}.csv'))
 
 # Full result pivots
 df = pd.DataFrame.from_records(full_results)
 df
 
-for metric in ['AUC', 'ACC', 'F1', 'PRE', 'REC']:
+for metric in ['AUC', 'ACC', 'F1', 'PRE', 'REC', 'FDR']:
     metric_df = df
     if metric == 'AUC':
         metric_df = df.loc[df.Cutoff == 'Empirical']
@@ -288,6 +293,6 @@ for metric in ['AUC', 'ACC', 'F1', 'PRE', 'REC']:
         .pivot_table(values=metric, index=['Dataset'], columns=['Method', 'Cutoff']) \
         * 100) \
         .round(2) \
-        .to_csv(os.path.join('results', f'dataset-v4-all-{metric}.csv'))
+        .to_csv(os.path.join('results', f'dataset-all-{metric}.csv'))
 
 # %%
