@@ -7,7 +7,7 @@ def PCA_by_variance(X_train, X_test, variance_threshold=0.9):
 
     explained_variance = np.cumsum(pca.explained_variance_ratio_)
     are_features_enough = explained_variance >= variance_threshold
-    num_features = np.where(are_features_enough)[0][0] + 1 if np.any(are_features_enough) else X.shape[1]
+    num_features = np.where(are_features_enough)[0][0] + 1 if np.any(are_features_enough) else X_train.shape[1]
     X_train_pca = X_train_pca[:, :num_features]
 
     X_test_pca = pca.transform(X_test)
@@ -175,20 +175,21 @@ for (dataset, format) in datasets:
     for exp in range(n_repeats):
         # Load data
         X, y = occ_datasets.load_dataset(dataset, format)
-        X_train, X_test, y_test = occ_datasets.split_occ_dataset(X, y, train_ratio=0.6)
-        inlier_rate = np.mean(y_test)
+        X_train_orig, X_test_orig, y_test_orig = occ_datasets.split_occ_dataset(X, y, train_ratio=0.6)
+        inlier_rate = np.mean(y_test_orig)
 
         for baseline in [
             # 'ECOD',
             'ECODv2',
             # 'ECODv2Min',
             # 'GeomMedian',
-            # 'Mahalanobis',
+            'Mahalanobis',
             # 'OC-SVM',
             # 'IForest',
         ]:
-            # for pca_variance_threshold in [0.5, 0.9, None]:
-            for pca_variance_threshold in [None]:
+            X_train, X_test, y_test = X_train_orig, X_test_orig, y_test_orig
+            for pca_variance_threshold in [0.5, 0.9, 1.0, None]:
+            # for pca_variance_threshold in [None]:
                 if pca_variance_threshold is not None:
                     if not 'ECODv2' in baseline:
                         continue
@@ -217,7 +218,7 @@ for (dataset, format) in datasets:
                     'Multisplit+BH',
                     'Multisplit+BH+pi',
                 ]:
-                    if cutoff_type != 'Empirical' and not 'ECODv2' in baseline:
+                    if cutoff_type != 'Empirical' and not 'ECODv2' in baseline and not 'Mahalanobis' in baseline:
                         continue
                     
                     N = len(X_train)
@@ -334,7 +335,7 @@ for metric in ['AUC', 'ACC', 'F1', 'PRE', 'REC', 'FDR', 'alpha', 'pi * alpha']:
         metric_df = df.loc[df.Cutoff == 'Empirical']
     
     pivot = metric_df \
-        .pivot_table(values=metric, index=['Dataset'], columns=['Method', 'Cutoff']) \
+        .pivot_table(values=metric, index=['Dataset'], columns=['Method', 'Cutoff'], dropna=False) \
         * (100 if metric not in ['FDR', 'alpha', 'pi * alpha'] else 1)
 
     pivots[metric] = pivot
