@@ -29,7 +29,6 @@ def sample_autoregressive(n, dim=2, rho=0.5, diff=2):
     return normal_sample_train @ autoregressive_matrix, \
         normal_sample_test @ autoregressive_matrix, \
         labels
-        
 
 auto_reg_train, auto_reg_test, _ = sample_autoregressive(n, dim, rho=0.5)
 plt.plot(auto_reg_train[:, 0], auto_reg_train[:, 1], '.')
