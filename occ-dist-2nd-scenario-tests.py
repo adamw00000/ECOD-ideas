@@ -178,16 +178,17 @@ for alpha in [0.05, 0.25, 0.5]:
         res_df = dist_df.groupby(['Distribution', 'N', 'Dim', 'Method', 'Cutoff', 'alpha'])\
             [['pi * alpha', 'AUC', 'ACC', 'PRE', 'REC', 'F1', '#', '#FD', '#D', 'FDR']] \
             .mean()
+        res_df['FDR < alpha'] = res_df['FDR'] < res_df.index.get_level_values('alpha')
+        res_df['FDR < pi * alpha'] = (res_df['FDR'] < res_df['pi * alpha'])
 
+        res_df = append_mean_row(res_df)
+        
         res_df[['AUC', 'ACC', 'PRE', 'REC', 'F1']] = (res_df[['AUC', 'ACC', 'PRE', 'REC', 'F1']] * 100) \
             .applymap('{0:.2f}'.format)
         res_df[['#FD', '#D']] = (res_df[['#FD', '#D']]) \
             .applymap('{0:.1f}'.format)
-        res_df['FDR < alpha'] = res_df['FDR'] < res_df.index.get_level_values('alpha')
-        res_df['FDR < pi * alpha'] = (res_df['FDR'] < res_df['pi * alpha'])
         res_df[['FDR', 'pi * alpha']] = res_df[['FDR', 'pi * alpha']].applymap('{0:.3f}'.format)
 
-        res_df = append_mean_row(res_df)
         display(res_df)
         res_df.to_csv(os.path.join(RESULTS_DIR, f'dist-{distribution}.csv'))
 
