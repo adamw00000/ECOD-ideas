@@ -150,6 +150,7 @@ for alpha in [0.05, 0.25, 0.5]:
             .pivot_table(values=metric, index=['Distribution', 'N', 'Dim'], columns=['Method', 'Cutoff'], dropna=False) \
             * 1
         
+        pivot = pivot.dropna(how='all')
         pivots[metric] = pivot
         pivot = append_mean_row(pivot)
 

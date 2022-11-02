@@ -62,7 +62,7 @@ datasets = [
 # ]
 
 # datasets = [
-#     ('Hepatitis', 'arff'),
+#     ('Mammography', 'mat'),
 # ]
 
 for alpha in [0.05, 0.25, 0.5]:
@@ -89,9 +89,9 @@ for alpha in [0.05, 0.25, 0.5]:
                 # 'OC-SVM',
                 # 'IForest',
             ]:
-                X_train, X_test, y_test = X_train_orig, X_test_orig, y_test_orig
                 for pca_variance_threshold in [0.5, 0.9, 1.0, None]:
                 # for pca_variance_threshold in [None]:
+                    X_train, X_test, y_test = X_train_orig, X_test_orig, y_test_orig
                     if pca_variance_threshold is not None:
                         if not 'ECODv2' in baseline and not 'Mahalanobis' in baseline:
                             continue
@@ -140,7 +140,6 @@ for alpha in [0.05, 0.25, 0.5]:
 
                         scores = clf.score_samples(X_test)
                         auc = metrics.roc_auc_score(y_test, scores)
-
 
                         if cutoff_type == 'Empirical':
                             emp_quantile = np.quantile(scores, q=1 - inlier_rate)
