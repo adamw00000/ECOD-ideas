@@ -208,10 +208,14 @@ class ECODv2(BaseDetector):
         self.U_skew = self.U_l * -1 * np.sign(
             self.skewness - 1) + self.U_r * np.sign(self.skewness + 1)
 
-        self.O = np.maximum(self.U_l, self.U_r)
-        self.O = np.maximum(self.U_skew, self.O)
+        self.O_left = self.U_l.sum(axis=1)
+        self.O_right = self.U_r.sum(axis=1)
+        self.O_skew = self.U_skew.sum(axis=1)
 
-        decision_scores_ = self.O.sum(axis=1)
+        self.O = np.maximum(self.O_left, self.O_right)
+        self.O = np.maximum(self.O_skew, self.O)
+
+        decision_scores_ = self.O
         return decision_scores_.ravel()
 
     def calculate_ecdf(self, ecdfs, X):

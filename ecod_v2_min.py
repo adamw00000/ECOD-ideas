@@ -207,10 +207,14 @@ class ECODv2Min(BaseDetector):
 
         self.U_min = np.minimum(self.U_l, self.U_r)
 
-        self.O = np.maximum(self.U_l, self.U_r)
-        self.O = np.maximum(self.U_min, self.O)
+        self.O_left = self.U_l.sum(axis=1)
+        self.O_right = self.U_r.sum(axis=1)
+        self.O_min = self.U_min.sum(axis=1)
 
-        decision_scores_ = self.O.sum(axis=1)
+        self.O = np.maximum(self.O_left, self.O_right)
+        self.O = np.maximum(self.O_min, self.O)
+
+        decision_scores_ = self.O
         return decision_scores_.ravel()
 
     def calculate_ecdf(self, ecdfs, X):
@@ -316,7 +320,7 @@ class ECODv2Min(BaseDetector):
         self.U_l = -1 * np.log(self.U_l)
         self.U_r = -1 * np.log(self.U_r)
 
-        self.U_min = np.min(self.U_l, self.U_r)
+        self.U_min = np.minimum(self.U_l, self.U_r)
 
         self.O = np.maximum(self.U_l, self.U_r)
         self.O = np.maximum(self.U_min, self.O)
