@@ -7,13 +7,7 @@ import scipy.stats
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
-from sklearn import metrics
-
-from pyod.models.ecod import ECOD
-from ecod_v2 import ECODv2
-from ecod_v2_min import ECODv2Min
-from sklearn.svm import OneClassSVM
-from sklearn.ensemble import IsolationForest
+from IPython.display import display
 
 n_repeats = 10
 resampling_repeats = 10
@@ -62,8 +56,10 @@ datasets = [
 # ]
 
 full_results = []
+metric_list = ['AUC', 'ACC', 'PRE', 'REC', 'F1', 'FDR', 'FRR', 'T1E']
 
 for (dataset, format) in datasets:
+    print(f'({format}) {dataset}')
     results = []
 
     for exp in range(n_repeats):
@@ -81,61 +77,31 @@ for (dataset, format) in datasets:
             'OC-SVM',
             'IForest',
         ]:
-            for pca_variance_threshold in [0.5, 0.9, 1.0, None]:
-                X_train, X_test, y_test = X_train_orig, X_test_orig, y_test_orig
-                if pca_variance_threshold is not None:
-                    if not 'ECODv2' in baseline:
-                        continue
-                    X_train, X_test, _ = PCA_by_variance(X_train, X_test, pca_variance_threshold)
+            for pca_variance_threshold in [None, 1.0]:
+                if pca_variance_threshold is not None and not apply_PCA_to_baseline(baseline):
+                    continue
 
-                if baseline == 'ECOD':
-                    clf = PyODWrapper(ECOD())
-                elif baseline == 'ECODv2':
-                    clf = PyODWrapper(ECODv2())
-                elif baseline == 'ECODv2Min':
-                    clf = PyODWrapper(ECODv2Min())
-                elif baseline == 'GeomMedian':
-                    clf = GeomMedianDistance()
-                elif baseline == 'Mahalanobis':
-                    clf = Mahalanobis()
-                elif baseline == 'OC-SVM':
-                    clf = OneClassSVM()
-                elif baseline == 'IForest':
-                    clf = IsolationForest()
+                X_train, X_test, y_test = apply_PCA_threshold(X_train_orig, X_test_orig, y_test_orig, pca_variance_threshold)
+                clf = get_occ_from_name(baseline)
                 
                 for cutoff_type in [
                     'Empirical',
-                    'Chi-squared',
-                    'Bootstrap',
-                    'Multisplit'
+                    # 'Chi-squared',
+                    # 'Bootstrap',
+                    'Multisplit',
                 ]:
-                    if cutoff_type != 'Empirical' and not 'ECODv2' in baseline and not 'Mahalanobis' in baseline:
+                    if 'Multisplit' in cutoff_type and not apply_multisplit_to_baseline(baseline):
                         continue
-                    
-                    N = len(X_train)
-                    if cutoff_type == 'Bootstrap' or cutoff_type == 'Multisplit':
-                        thresholds = []
-
-                        for i in range(resampling_repeats):
-                            if cutoff_type == 'Bootstrap':
-                                resampling_samples = np.random.choice(range(N), size=N, replace=True)
-                            else:
-                                # Multisplit
-                                resampling_samples = np.random.choice(range(N), size=int(N/2), replace=False)
-                            is_selected_sample = np.isin(range(N), resampling_samples)
-                            X_resampling_train, X_resampling_cal = X_train[is_selected_sample], X_train[~is_selected_sample]
-                            
-                            clf.fit(X_resampling_train)
-                            scores = clf.score_samples(X_resampling_cal)
-
-                            emp_quantile = np.quantile(scores, q=1 - inlier_rate)
-                            thresholds.append(emp_quantile)                        
-                        resampling_threshold = np.mean(thresholds)
+                
+                    if 'Bootstrap' in cutoff_type or 'Multisplit' in cutoff_type:
+                        if 'Bootstrap' in cutoff_type:
+                            resampling_method = 'Bootstrap'
+                        else:
+                            resampling_method = 'Multisplit'
+                        resampling_threshold = prepare_resampling_threshold(clf, X_train, resampling_repeats, inlier_rate, method=resampling_method)
 
                     clf.fit(X_train)
-
                     scores = clf.score_samples(X_test)
-                    auc = metrics.roc_auc_score(y_test, scores)
 
                     if cutoff_type == 'Empirical':
                         emp_quantile = np.quantile(scores, q=1 - inlier_rate)
@@ -144,32 +110,25 @@ for (dataset, format) in datasets:
                         d = X_test.shape[1]
                         chi_quantile = -scipy.stats.chi2.ppf(1 - inlier_rate, 2 * d)
                         y_pred = np.where(scores > chi_quantile, 1, 0)
-                    elif cutoff_type == 'Bootstrap' or cutoff_type == 'Multisplit':
+                    elif 'Bootstrap' in cutoff_type or 'Multisplit' in cutoff_type:
                         y_pred = np.where(scores > resampling_threshold, 1, 0)
                 
-                    false_detections = np.sum((y_pred == 0) & (y_test == 1))
-                    detections = np.sum(y_pred == 0)
-                    fdr = false_detections / detections
+                    test_metrics = get_metrics(y_test, y_pred, scores)
 
-                    acc = metrics.accuracy_score(y_test, y_pred)
-                    pre = metrics.precision_score(y_test, y_pred)
-                    rec = metrics.recall_score(y_test, y_pred)
-                    f1 = metrics.f1_score(y_test, y_pred)
-
-                    print(f'{dataset}.{format}: {baseline}{f"+PCA{pca_variance_threshold:.1f}" if pca_variance_threshold is not None else ""} ({cutoff_type}, {exp+1}/{n_repeats})' + \
-                        f' ||| AUC: {100 * auc:3.2f}, ACC: {100 * acc:3.2f}, F1: {100 * f1:3.2f}')
+                    # print(f'{dataset}.{format}: {baseline}{f"+PCA{pca_variance_threshold:.1f}" if pca_variance_threshold is not None else ""} ({cutoff_type}, {exp+1}/{n_repeats})' + \
+                    #     f' ||| AUC: {100 * auc:3.2f}, ACC: {100 * acc:3.2f}, F1: {100 * f1:3.2f}')
+                    
                     occ_metrics = {
                         'Dataset': f'({format}) {dataset}',
                         'Method': baseline + (f"+PCA{pca_variance_threshold:.1f}" if pca_variance_threshold is not None else ""),
                         'Cutoff': cutoff_type,
                         'Exp': exp + 1,
-                        'AUC': auc,
-                        'ACC': acc,
-                        'PRE': pre,
-                        'REC': rec,
-                        'F1': f1,
-                        'FDR': fdr,
                     }
+                    for metric in metric_list:
+                        if metric in occ_metrics and metric not in test_metrics:
+                            continue
+                        occ_metrics[metric] = test_metrics[metric]
+                    
                     results.append(occ_metrics)
                     full_results.append(occ_metrics)
     
@@ -177,7 +136,7 @@ for (dataset, format) in datasets:
 
     dataset_df = df[df.Dataset == f'({format}) {dataset}']
     res_df = dataset_df.groupby(['Dataset', 'Method', 'Cutoff'])\
-        [['AUC', 'ACC', 'PRE', 'REC', 'F1', 'FDR']] \
+        [metric_list] \
         .mean() \
         .round(4) \
         * 100
@@ -190,7 +149,7 @@ for (dataset, format) in datasets:
 df = pd.DataFrame.from_records(full_results)
 df
 
-for metric in ['AUC', 'ACC', 'F1', 'PRE', 'REC', 'FDR']:
+for metric in metric_list:
     metric_df = df
     if metric == 'AUC':
         metric_df = df.loc[df.Cutoff == 'Empirical']

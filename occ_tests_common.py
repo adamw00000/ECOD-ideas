@@ -174,6 +174,176 @@ class PyODWrapper():
     def score_samples(self, X):
         return -self.model.decision_function(X)
 
+# %%
+from pyod.models.ecod import ECOD
+from ecod_v2 import ECODv2
+from ecod_v2_min import ECODv2Min
+from sklearn.svm import OneClassSVM
+from sklearn.ensemble import IsolationForest
+
+def get_occ_from_name(clf_name):
+    if clf_name == 'ECOD':
+        clf = PyODWrapper(ECOD())
+    elif clf_name == 'ECODv2':
+        clf = PyODWrapper(ECODv2())
+    elif clf_name == 'ECODv2Min':
+        clf = PyODWrapper(ECODv2Min())
+    elif clf_name == 'GeomMedian':
+        clf = GeomMedianDistance()
+    elif clf_name == 'Mahalanobis':
+        clf = Mahalanobis()
+    elif clf_name == 'OC-SVM':
+        clf = OneClassSVM()
+    elif clf_name == 'IForest':
+        clf = IsolationForest()
+    return clf
+
+# %%
+def filter_inliers(X_test, y_test):
+    inliers = np.where(y_test == 1)[0]
+    y_test = y_test[inliers]
+    X_test = X_test[inliers, :]
+    return X_test,y_test
+
+# %%
+def apply_PCA_threshold(X_train_orig, X_test_orig, y_test_orig, pca_variance_threshold):
+    X_train, X_test, y_test = X_train_orig, X_test_orig, y_test_orig
+    if pca_variance_threshold is not None:
+        X_train, X_test, _ = PCA_by_variance(X_train, X_test, pca_variance_threshold)
+    
+    return X_train, X_test, y_test
+
+def apply_PCA_to_baseline(baseline):
+    return baseline in ['ECODv2', 'Mahalanobis']
+
+# %%
+def prepare_resampling_threshold(clf, X_train, resampling_repeats, inlier_rate, method):
+    N = len(X_train)
+    thresholds = []
+
+    for _ in range(resampling_repeats):
+        if method == 'Bootstrap':
+            resampling_samples = np.random.choice(range(N), size=N, replace=True)
+        elif method == 'Multisplit':
+            resampling_samples = np.random.choice(range(N), size=int(N/2), replace=False)
+        else:
+            raise NotImplementedError()
+        
+        is_selected_sample = np.isin(range(N), resampling_samples)
+        X_resampling_train, X_resampling_cal = X_train[is_selected_sample], X_train[~is_selected_sample]
+                            
+        clf.fit(X_resampling_train)
+        scores = clf.score_samples(X_resampling_cal)
+
+        emp_quantile = np.quantile(scores, q=1 - inlier_rate)
+        thresholds.append(emp_quantile)
+    
+    resampling_threshold = np.mean(thresholds)
+    return resampling_threshold
+
+# %%
+def prepare_multisplit_cal_scores(clf, X_train, resampling_repeats):
+    N = len(X_train)
+    cal_scores_all = np.zeros((resampling_repeats, N - int(N/2)))
+
+    for i in range(resampling_repeats):
+        multisplit_samples = np.random.choice(range(N), size=int(N/2), replace=False)
+        is_multisplit_sample = np.isin(range(N), multisplit_samples)
+        X_multi_train, X_multi_cal = X_train[is_multisplit_sample], X_train[~is_multisplit_sample]
+        
+        clf.fit(X_multi_train)
+        cal_scores = clf.score_samples(X_multi_cal)
+        cal_scores_all[i, :] = cal_scores
+    
+    return cal_scores_all
+
+def get_multisplit_p_values(scores, multisplit_cal_scores, median_multiplier=2):
+    resampling_repeats = len(multisplit_cal_scores)
+
+    p_vals_all = np.zeros((resampling_repeats, len(scores)))
+    for i in range(resampling_repeats):
+        cal_scores = multisplit_cal_scores[i, :]
+        num_smaller_cal_scores = (scores > cal_scores.reshape(-1, 1)).sum(axis=0)
+        p_vals = (num_smaller_cal_scores + 1) / (len(cal_scores) + 1)
+        p_vals_all[i, :] = p_vals
+
+    p_vals = median_multiplier * np.median(p_vals_all, axis=0)
+    return p_vals
+
+def apply_multisplit_to_baseline(baseline):
+    return baseline in ['ECODv2', 'Mahalanobis']
+
+# %%
+def use_BH_procedure(p_vals, alpha, pi=None):
+    if pi is None:
+        fdr_ctl_threshold = alpha
+    else:
+        fdr_ctl_threshold = alpha / pi
+    
+    # if 'pi' in cutoff_type:
+    #     pi = inlier_rate
+    #     fdr_ctl_threshold = alpha / pi
+                                
+    sorted_indices = np.argsort(p_vals)
+    bh_thresholds = np.linspace(fdr_ctl_threshold / len(p_vals), fdr_ctl_threshold, len(p_vals))
+                                
+    # is_h0_rejected == is_outlier, H_0: X ~ P_X
+    is_h0_rejected = p_vals[sorted_indices] < bh_thresholds
+
+    # take all the point to the left of last discovery
+    rejections = np.where(is_h0_rejected)[0]
+    if len(rejections) > 0:
+        is_h0_rejected[:(np.max(rejections) + 1)] = True
+
+    y_pred = np.ones_like(p_vals)
+    y_pred[sorted_indices[is_h0_rejected]] = 0
+    return y_pred
+
+# %%
+from sklearn import metrics
+
+def get_metrics(y_test, y_pred, scores, one_class_only=False):
+    false_detections = np.sum((y_pred == 0) & (y_test == 1))
+    detections = np.sum(y_pred == 0)
+    if detections == 0:
+        fdr = np.nan
+    else:
+        fdr = false_detections / detections
+
+    if not one_class_only:
+        auc = metrics.roc_auc_score(y_test, scores)
+    else:
+        auc = np.nan
+    
+    acc = metrics.accuracy_score(y_test, y_pred)
+    pre = metrics.precision_score(y_test, y_pred, zero_division=0)
+    rec = metrics.recall_score(y_test, y_pred, zero_division=0)
+    f1 = metrics.f1_score(y_test, y_pred, zero_division=0)
+
+    inlier_idx = np.where(y_test == 1)[0]
+    t1e = 1 - np.mean(y_pred[inlier_idx] == y_test[inlier_idx])
+
+    # important for PU
+    false_rejections = np.sum((y_pred == 1) & (y_test == 0)) # False rejections == negative samples predicted to be positive
+    rejections = np.sum(y_pred == 1) # All rejections == samples predicted to be positive
+    if rejections == 0:
+        frr = np.nan
+    else:
+        frr = false_rejections / rejections
+
+    return {
+        'AUC': auc,
+        'ACC': acc,
+        'PRE': pre,
+        'REC': rec,
+        'F1': f1,
+        'FDR': fdr,
+        'FRR': frr,
+        'T1E': t1e, # Type I Error
+
+        '#FD': false_detections,
+        '#D': detections,
+    }
 
 # %%
 import pandas as pd
