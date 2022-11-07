@@ -274,32 +274,6 @@ def apply_multisplit_to_baseline(baseline):
     return baseline in ['ECODv2', 'Mahalanobis']
 
 # %%
-def use_BH_procedure(p_vals, alpha, pi=None):
-    if pi is None:
-        fdr_ctl_threshold = alpha
-    else:
-        fdr_ctl_threshold = alpha / pi
-    
-    # if 'pi' in cutoff_type:
-    #     pi = inlier_rate
-    #     fdr_ctl_threshold = alpha / pi
-                                
-    sorted_indices = np.argsort(p_vals)
-    bh_thresholds = np.linspace(fdr_ctl_threshold / len(p_vals), fdr_ctl_threshold, len(p_vals))
-                                
-    # is_h0_rejected == is_outlier, H_0: X ~ P_X
-    is_h0_rejected = p_vals[sorted_indices] < bh_thresholds
-
-    # take all the point to the left of last discovery
-    rejections = np.where(is_h0_rejected)[0]
-    if len(rejections) > 0:
-        is_h0_rejected[:(np.max(rejections) + 1)] = True
-
-    y_pred = np.ones_like(p_vals)
-    y_pred[sorted_indices[is_h0_rejected]] = 0
-    return y_pred
-
-# %%
 from sklearn import metrics
 
 def get_metrics(y_test, y_pred, scores, one_class_only=False):
@@ -344,6 +318,162 @@ def get_metrics(y_test, y_pred, scores, one_class_only=False):
         '#FD': false_detections,
         '#D': detections,
     }
+
+# %%
+import os
+import matplotlib.pyplot as plt
+import seaborn as sns
+import pandas as pd
+
+def visualize_scores(scores, p_vals, y_test, 
+        train_scores, train_p_vals, test_case_name, 
+        clf_name, cutoff_type, results_dir, plot_scores=True):
+    inlier_idx = np.where(y_test == 1)[0]
+    inlier_mask = np.isin(range(len(y_test)), inlier_idx)
+
+    df = pd.DataFrame({
+        'Score': scores,
+        'p-value': p_vals,
+        'Class': np.where(inlier_mask, 'Inlier', 'Outlier'),
+    })
+    train_df = pd.DataFrame({
+        'Score': train_scores,
+        'p-value': train_p_vals,
+        'Class': np.ones_like(train_p_vals),
+    })
+
+    os.makedirs(os.path.join(results_dir, 'img', test_case_name), exist_ok=True)
+
+    for metric in ['Score', 'p-value']:
+        if metric == 'Score' and not plot_scores:
+            continue
+
+        _, axs = plt.subplots(1, 2, figsize=(12, 5), sharey=True)
+        sns.histplot(train_df, x=metric, ax=axs[0],
+            hue_order=['Inlier'])
+        axs[0].set_title('Train')
+        sns.histplot(df, x=metric, hue='Class', ax=axs[1],
+            hue_order=['Inlier', 'Outlier'])
+        axs[1].set_title('Test')
+        
+        plt.suptitle(f'{test_case_name} ({clf_name}) - {metric} distribution')
+        plt.savefig(
+            os.path.join(results_dir, 'img', test_case_name, f'{metric}-distribution-{clf_name}-{cutoff_type}.png'),
+            dpi=300,
+            bbox_inches='tight'
+        )
+        plt.close()
+
+        if not plot_scores:
+            continue
+
+        # Plot ROC
+        fpr, tpr, _ = metrics.roc_curve(y_test, df[metric], pos_label=1)
+
+        plt.figure(figsize=(8, 6))
+        plt.plot(
+            fpr,
+            tpr,
+            color="darkorange",
+            lw=2,
+            label="ROC curve (area = %0.2f)" % metrics.auc(fpr, tpr),
+        )
+        plt.plot([0, 1], [0, 1], color="navy", lw=2, linestyle="--")
+        plt.xlim([0.0, 1.0])
+        plt.ylim([0.0, 1.05])
+        plt.xlabel("False Positive Rate")
+        plt.ylabel("True Positive Rate")
+        plt.title(f"{test_case_name} ({clf_name}) - {metric} ROC (for Inliers)")
+        plt.legend(loc="lower right")
+
+        plt.savefig(
+            os.path.join(results_dir, 'img', test_case_name, f'{metric}-ROC-{clf_name}-{cutoff_type}.png'),
+            dpi=300,
+            bbox_inches='tight'
+        )
+        plt.close()
+
+# %%
+import matplotlib.pyplot as plt
+
+def use_BH_procedure(p_vals, alpha, pi=None, 
+        visualize=False, y_test=None, test_case_name=None,
+        clf_name=None, cutoff_type=None, results_dir=None):
+    if pi is None:
+        fdr_ctl_threshold = alpha
+    else:
+        fdr_ctl_threshold = alpha / pi
+    
+    sorted_indices = np.argsort(p_vals)
+    bh_thresholds = np.linspace(fdr_ctl_threshold / len(p_vals), fdr_ctl_threshold, len(p_vals))
+    
+    # is_h0_rejected == is_outlier, H_0: X ~ P_X
+    is_h0_rejected = p_vals[sorted_indices] < bh_thresholds
+
+    # take all the point to the left of last discovery
+    rejections = np.where(is_h0_rejected)[0]
+    if len(rejections) > 0:
+        num_rejected = (np.max(rejections) + 1)
+        is_h0_rejected[:num_rejected] = True
+
+    if visualize:
+        visualize_BH(p_vals, alpha, pi, y_test, test_case_name, clf_name, cutoff_type, results_dir, fdr_ctl_threshold, sorted_indices, bh_thresholds, is_h0_rejected, rejections)
+
+    y_pred = np.ones_like(p_vals)
+    y_pred[sorted_indices[is_h0_rejected]] = 0
+    return y_pred
+
+def visualize_BH(p_vals, alpha, pi,
+        y_test, test_case_name,
+        clf_name, cutoff_type, results_dir, 
+        fdr_ctl_threshold, sorted_indices, 
+        bh_thresholds, is_h0_rejected, rejections):
+    os.makedirs(os.path.join(results_dir, 'img', test_case_name), exist_ok=True)
+
+    for zoom in [False, True]:
+        num_elements = len(y_test)
+        if zoom:
+            num_zoom_elements = 100
+            if len(rejections) > 0:
+                num_rejected = (np.max(rejections) + 1)
+                num_zoom_elements = max(num_zoom_elements, 2 * num_rejected)
+            num_elements = min(num_zoom_elements, len(y_test))
+            
+        x = list(range(len(p_vals)))
+        pval_vec = p_vals[sorted_indices]
+        outlier_vec = np.where(y_test[sorted_indices] == 0, 'Outlier', 'Inlier')
+        rejected_vec = np.where(is_h0_rejected, 'Rejected', 'Not rejected')
+
+        plt.figure(figsize=(12, 8))
+        sns.scatterplot(x=x[:num_elements], y=pval_vec[:num_elements], 
+                hue=outlier_vec[:num_elements], style=rejected_vec[:num_elements],
+                hue_order=['Inlier', 'Outlier'],
+                style_order=['Not rejected', 'Rejected'],
+                edgecolor='k', linewidth=.3)
+        sns.scatterplot(x=x[:num_elements], y=bh_thresholds[:num_elements], 
+                hue=['B-H threshold'] * num_elements,
+                palette=['r'],
+                edgecolor=None, s=2)
+        # sns.lineplot(x=x[:num_elements], y=bh_thresholds[:num_elements],
+        #         hue=['B-H threshold'] * num_elements,
+        #         palette=['r'],
+        #         linestyle='--')
+            
+        plt.title(f'{test_case_name} - {clf_name}, {cutoff_type}, alpha={alpha}' + \
+                f'{f" (+pi => alpha={fdr_ctl_threshold:.3f}" if pi is not None else ""}' + \
+                f'{f" (zoomed)" if zoom else ""}')
+        plt.ylim(0, None)
+        
+        legend = plt.legend()
+        legend.legendHandles[-1]._sizes = [8.]
+
+        plt.savefig(
+                os.path.join(results_dir, 'img', test_case_name, 
+                    f'{clf_name}-{cutoff_type}{"_zoom" if zoom else ""}.png'),
+                dpi=300,
+                bbox_inches='tight'
+            )
+        plt.close()
 
 # %%
 import pandas as pd

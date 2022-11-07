@@ -66,7 +66,8 @@ for alpha in [0.05, 0.25, 0.5]:
     os.makedirs(RESULTS_DIR, exist_ok=True)
     
     for (dataset, format) in datasets:
-        print(f'({format}) {dataset} (alpha = {alpha:.2f})')
+        test_case_name = f'({format}) {dataset}'
+        print(f'{test_case_name} (alpha = {alpha:.2f})')
         results = []
 
         for exp in range(n_repeats):
@@ -98,12 +99,21 @@ for alpha in [0.05, 0.25, 0.5]:
                         'Multisplit',
                         'Multisplit+BH',
                         'Multisplit+BH+pi',
+                        'Multisplit-1_repeat',
+                        'Multisplit-1_repeat+BH',
+                        'Multisplit-1_repeat+BH+pi',
+                        'Multisplit-1_median',
+                        'Multisplit-1_median+BH',
+                        'Multisplit-1_median+BH+pi',
                     ]:
                         if 'Multisplit' in cutoff_type and not apply_multisplit_to_baseline(baseline):
                             continue
                         
                         if 'Multisplit' in cutoff_type:
-                            multisplit_cal_scores = prepare_multisplit_cal_scores(clf, X_train, resampling_repeats)
+                            if '1_repeat' in cutoff_type:
+                                multisplit_cal_scores = prepare_multisplit_cal_scores(clf, X_train, resampling_repeats=1)
+                            else:
+                                multisplit_cal_scores = prepare_multisplit_cal_scores(clf, X_train, resampling_repeats=resampling_repeats)
 
                         clf.fit(X_train)
                         scores = clf.score_samples(X_test)
@@ -112,15 +122,48 @@ for alpha in [0.05, 0.25, 0.5]:
                             emp_quantile = np.quantile(scores, q=1 - inlier_rate)
                             y_pred = np.where(scores > emp_quantile, 1, 0)
                         elif 'Multisplit' in cutoff_type:
-                            p_vals = get_multisplit_p_values(scores, multisplit_cal_scores, median_multiplier=2)
+                            p_vals = get_multisplit_p_values(scores, multisplit_cal_scores, 
+                                median_multiplier=1 if '1_median' in cutoff_type else 2) # 2 should be correct
                             y_pred = np.where(p_vals < alpha, 0, 1)
+
+                            if exp == 0 and '+pi' in cutoff_type and pca_variance_threshold is None \
+                                    and '1_repeat' not in cutoff_type:
+                                train_scores = clf.score_samples(X_train)
+                                train_p_vals = get_multisplit_p_values(train_scores, multisplit_cal_scores, 
+                                    median_multiplier=1 if '1_median' in cutoff_type else 2)
+
+                                visualize_scores(scores, p_vals, y_test, 
+                                    train_scores, train_p_vals,
+                                    test_case_name,
+                                    baseline,
+                                    cutoff_type,
+                                    RESULTS_DIR,
+                                    plot_scores=cutoff_type == 'Multisplit+BH+pi')
+
+                            if 'BH' in cutoff_type:
+                                if 'pi' in cutoff_type:
+                                    pi=inlier_rate
+                                else:
+                                    pi=None
+                                
+                                if exp == 0 and pca_variance_threshold is None \
+                                        and '1_repeat' not in cutoff_type:
+                                    y_pred = use_BH_procedure(p_vals, alpha, pi,
+                                        visualize=True,
+                                        y_test=y_test,
+                                        test_case_name=test_case_name,
+                                        clf_name=baseline,
+                                        cutoff_type=cutoff_type,
+                                        results_dir=RESULTS_DIR)
+                                else:
+                                    y_pred = use_BH_procedure(p_vals, alpha, pi)
 
                         test_metrics = get_metrics(y_test, y_pred, scores)
 
                         # print(f'{dataset}.{format}: {baseline}{f"+PCA{pca_variance_threshold:.1f}" if pca_variance_threshold is not None else ""} ({cutoff_type}, {exp+1}/{n_repeats})' + \
                         #     f' ||| AUC: {100 * auc:3.2f}, ACC: {100 * acc:3.2f}, F1: {100 * f1:3.2f}, FDR: {fdr:.3f}')
                         occ_metrics = {
-                            'Dataset': f'({format}) {dataset}',
+                            'Dataset': test_case_name,
                             'Method': baseline + (f"+PCA{pca_variance_threshold:.1f}" if pca_variance_threshold is not None else ""),
                             'Cutoff': cutoff_type,
                             'Exp': exp + 1,
@@ -138,7 +181,7 @@ for alpha in [0.05, 0.25, 0.5]:
         
         df = pd.DataFrame.from_records(results)
 
-        dataset_df = df[df.Dataset == f'({format}) {dataset}']
+        dataset_df = df[df.Dataset == test_case_name]
         res_df = dataset_df.groupby(['Dataset', 'Method', 'Cutoff', 'alpha'])\
             [metric_list] \
             .mean() \
@@ -147,13 +190,6 @@ for alpha in [0.05, 0.25, 0.5]:
         res_df['FDR < pi * alpha'] = (res_df['FDR'] < res_df['pi * alpha'])
 
         res_df = append_mean_row(res_df)
-        
-        # res_df[['AUC', 'ACC', 'PRE', 'REC', 'F1']] = (res_df[['AUC', 'ACC', 'PRE', 'REC', 'F1']] * 100) \
-        #     .applymap('{0:.2f}'.format)
-        # res_df[['#FD', '#D']] = (res_df[['#FD', '#D']]) \
-        #     .applymap('{0:.1f}'.format)
-        # res_df[['FDR', 'pi * alpha']] = res_df[['FDR', 'pi * alpha']].applymap('{0:.3f}'.format)
-
         display(res_df)
         res_df.to_csv(os.path.join(RESULTS_DIR, f'dataset-{format}-{dataset}.csv'))
 

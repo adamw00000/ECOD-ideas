@@ -87,7 +87,7 @@ for (dataset, format) in datasets:
                 for cutoff_type in [
                     'Empirical',
                     # 'Chi-squared',
-                    # 'Bootstrap',
+                    'Bootstrap',
                     'Multisplit',
                 ]:
                     if 'Multisplit' in cutoff_type and not apply_multisplit_to_baseline(baseline):
@@ -112,7 +112,7 @@ for (dataset, format) in datasets:
                         y_pred = np.where(scores > chi_quantile, 1, 0)
                     elif 'Bootstrap' in cutoff_type or 'Multisplit' in cutoff_type:
                         y_pred = np.where(scores > resampling_threshold, 1, 0)
-                
+                    
                     test_metrics = get_metrics(y_test, y_pred, scores)
 
                     # print(f'{dataset}.{format}: {baseline}{f"+PCA{pca_variance_threshold:.1f}" if pca_variance_threshold is not None else ""} ({cutoff_type}, {exp+1}/{n_repeats})' + \

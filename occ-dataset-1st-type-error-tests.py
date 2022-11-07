@@ -92,18 +92,27 @@ for alpha in [0.05, 0.25, 0.5]:
                     
                     for cutoff_type in [
                         'Multisplit',
+                        'Multisplit-1_repeat',
+                        'Multisplit-1_median',
                     ]:
                         if 'Multisplit' in cutoff_type and not apply_multisplit_to_baseline(baseline):
                             continue
                         
                         if 'Multisplit' in cutoff_type:
-                            multisplit_cal_scores = prepare_multisplit_cal_scores(clf, X_train, resampling_repeats)
+                            if '1_repeat' in cutoff_type:
+                                multisplit_cal_scores = prepare_multisplit_cal_scores(clf, X_train, resampling_repeats=1)
+                            else:
+                                multisplit_cal_scores = prepare_multisplit_cal_scores(clf, X_train, resampling_repeats=resampling_repeats)
 
                         clf.fit(X_train)
                         scores = clf.score_samples(X_test)
 
                         if 'Multisplit' in cutoff_type:
-                            p_vals = get_multisplit_p_values(scores, multisplit_cal_scores, median_multiplier=2)
+                            if '1_median' in cutoff_type:
+                                p_vals = get_multisplit_p_values(scores, multisplit_cal_scores, median_multiplier=1)
+                            else:
+                                # Theoretical value
+                                p_vals = get_multisplit_p_values(scores, multisplit_cal_scores, median_multiplier=2)
                             y_pred = np.where(p_vals < alpha, 0, 1)
             
                         test_metrics = get_metrics(y_test, y_pred, scores, one_class_only=True)

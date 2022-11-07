@@ -59,12 +59,21 @@ for alpha in [0.05, 0.25, 0.5]:
                                 'Multisplit',
                                 'Multisplit+BH',
                                 'Multisplit+BH+pi',
+                                'Multisplit-1_repeat',
+                                'Multisplit-1_repeat+BH',
+                                'Multisplit-1_repeat+BH+pi',
+                                'Multisplit-1_median',
+                                'Multisplit-1_median+BH',
+                                'Multisplit-1_median+BH+pi',
                             ]:
                                 if 'Multisplit' in cutoff_type and not apply_multisplit_to_baseline(baseline):
                                     continue
 
                                 if 'Multisplit' in cutoff_type:
-                                    multisplit_cal_scores = prepare_multisplit_cal_scores(clf, X_train, resampling_repeats)
+                                    if '1_repeat' in cutoff_type:
+                                        multisplit_cal_scores = prepare_multisplit_cal_scores(clf, X_train, resampling_repeats=1)
+                                    else:
+                                        multisplit_cal_scores = prepare_multisplit_cal_scores(clf, X_train, resampling_repeats=resampling_repeats)
 
                                 clf.fit(X_train)
                                 scores = clf.score_samples(X_test)
@@ -73,7 +82,11 @@ for alpha in [0.05, 0.25, 0.5]:
                                     emp_quantile = np.quantile(scores, q=1 - inlier_rate)
                                     y_pred = np.where(scores > emp_quantile, 1, 0)
                                 elif 'Multisplit' in cutoff_type:
-                                    p_vals = get_multisplit_p_values(scores, multisplit_cal_scores, median_multiplier=2)
+                                    if '1_median' in cutoff_type:
+                                        p_vals = get_multisplit_p_values(scores, multisplit_cal_scores, median_multiplier=1)
+                                    else:
+                                        # Theoretical value
+                                        p_vals = get_multisplit_p_values(scores, multisplit_cal_scores, median_multiplier=2)
                                     y_pred = np.where(p_vals < alpha, 0, 1)
 
                                     if 'BH' in cutoff_type:
@@ -116,7 +129,6 @@ for alpha in [0.05, 0.25, 0.5]:
         res_df['FDR < pi * alpha'] = (res_df['FDR'] < res_df['pi * alpha'])
 
         res_df = append_mean_row(res_df)
-        
         display(res_df)
         res_df.to_csv(os.path.join(RESULTS_DIR, f'dist-{distribution}.csv'))
 
