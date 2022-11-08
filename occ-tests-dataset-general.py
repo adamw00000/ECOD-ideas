@@ -1,6 +1,6 @@
 # %%
 from occ_all_tests_common import *
-from occ_base_test_general import run_general_tests
+from occ_test_base_general import run_general_tests
 import occ_datasets
 
 DATASET_TYPE = 'ECODdata'
