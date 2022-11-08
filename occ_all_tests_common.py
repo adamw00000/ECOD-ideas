@@ -522,3 +522,13 @@ def append_mean_row(df):
         df,
         df.mean(axis=0).to_frame(name=name).transpose().round(3)
     ])
+
+# %%
+metrics_to_multiply_by_100 = ['AUC', 'ACC', 'PRE', 'REC', 'F1']
+
+def round_and_multiply_metric(df, metric):
+    if metric in metrics_to_multiply_by_100:
+        df = (df * 100).round(2)
+    else:
+        df = df.round(3)
+    return df

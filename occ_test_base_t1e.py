@@ -9,7 +9,6 @@ n_repeats = 10
 resampling_repeats = 10
 metric_list = ['T1E']
 alpha_metric = 'T1E'
-metrics_to_multiply_by_100 = ['AUC', 'ACC', 'PRE', 'REC', 'F1']
 
 test_description = 'Type I Error tests'
 
@@ -101,9 +100,8 @@ def run_type_I_error_tests(DATASET_TYPE, get_all_distribution_configs, alpha):
         if alpha_metric is not None:
             res_df[f'{alpha_metric} < alpha'] = res_df[alpha_metric] < alpha
 
-        res_df[metrics_to_multiply_by_100] = \
-            (res_df[metrics_to_multiply_by_100] * 100).round(2)
-        res_df[metric_list] = res_df[metric_list].round(3)
+        for metric in metric_list:
+            res_df[metric] = round_and_multiply_metric(res_df[metric], metric)
 
         res_df = append_mean_row(res_df)
         display(res_df)
@@ -125,11 +123,7 @@ def run_type_I_error_tests(DATASET_TYPE, get_all_distribution_configs, alpha):
         pivot = pivot.dropna(how='all')
         pivots[metric] = pivot
         pivot = append_mean_row(pivot)
-
-        if metric in metrics_to_multiply_by_100:
-            pivot = (pivot * 100).round(2)
-        else:
-            pivot = pivot.round(3)
+        pivot = round_and_multiply_metric(pivot, metric)
 
         pivot \
             .to_csv(os.path.join(RESULTS_DIR, f'{DATASET_TYPE}-all-{metric}.csv'))
