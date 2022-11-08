@@ -57,7 +57,8 @@ datasets = [
 #     ('Mammography', 'mat'),
 # ]
 
-metric_list = ['pi * alpha', 'AUC', 'ACC', 'PRE', 'REC', 'F1', '#', '#FD', '#D', 'FDR']
+metric_list = ['pi * alpha', 'AUC', 'ACC', 'PRE', 'REC', 'F1', 
+    'T1E', 'FRR', '#', '#FD', '#D', 'FDR']
 
 def prepare_metrics(y_test, y_pred, scores, occ_metrics, metric_list):
     method_metrics = dict(occ_metrics)
@@ -69,7 +70,7 @@ def prepare_metrics(y_test, y_pred, scores, occ_metrics, metric_list):
         method_metrics[metric] = test_metrics[metric]
     return method_metrics
 
-for alpha in [0.05, 0.25, 0.5]:
+for alpha in [0.05, 0.25]:
     full_results = []
 
     RESULTS_DIR = f'results_fdr_{alpha:.2f}'

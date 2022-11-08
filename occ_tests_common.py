@@ -384,8 +384,8 @@ def visualize_scores(scores, p_vals, y_test,
             label="ROC curve (area = %0.2f)" % metrics.auc(fpr, tpr),
         )
         plt.plot([0, 1], [0, 1], color="navy", lw=2, linestyle="--")
-        plt.xlim([0.0, 1.0])
-        plt.ylim([0.0, 1.05])
+        plt.xlim([-0.01, 1.0])
+        plt.ylim([0.0, 1.01])
         plt.xlabel("False Positive Rate")
         plt.ylabel("True Positive Rate")
         plt.title(f"{test_case_name} ({clf_name}) - {metric} ROC (for Inliers)")
