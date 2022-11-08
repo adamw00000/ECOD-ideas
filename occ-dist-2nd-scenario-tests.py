@@ -1,6 +1,6 @@
 # %%
 from occ_all_tests_common import *
-from occ_fdr_test import run_fdr_tests
+from occ_base_test_fdr import run_fdr_tests
 
 DATASET_TYPE = 'GENdist'
 

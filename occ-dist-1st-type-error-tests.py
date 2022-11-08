@@ -1,6 +1,6 @@
 # %%
 from occ_all_tests_common import *
-from occ_type_I_error_test import run_type_I_error_tests
+from occ_base_test_t1e import run_type_I_error_tests
 
 DATASET_TYPE = 'GENdist'
 

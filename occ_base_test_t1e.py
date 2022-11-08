@@ -11,6 +11,27 @@ metric_list = ['T1E']
 alpha_metric = 'T1E'
 metrics_to_multiply_by_100 = ['AUC', 'ACC', 'PRE', 'REC', 'F1']
 
+test_description = 'Type I Error tests'
+
+baselines = [
+    # 'ECOD',
+    'ECODv2',
+    # 'ECODv2Min',
+    # 'GeomMedian',
+    'Mahalanobis',
+    # 'OC-SVM',
+    # 'IForest',
+]
+cutoffs = [
+    'Empirical',
+    # 'Chi-squared',
+    # 'Bootstrap',
+    'Multisplit',
+    'Multisplit-1_repeat',
+    'Multisplit-1_median',
+]
+pca_thresholds = [None, 1.0]
+
 def run_type_I_error_tests(DATASET_TYPE, get_all_distribution_configs, alpha):
     full_results = []
 
@@ -18,7 +39,7 @@ def run_type_I_error_tests(DATASET_TYPE, get_all_distribution_configs, alpha):
     os.makedirs(RESULTS_DIR, exist_ok=True)
 
     for (test_case_name, get_dataset_function) in get_all_distribution_configs():
-        print(f'TYPE I ERROR tests: {test_case_name} (alpha = {alpha:.2f})')
+        print(f'{test_description}: {test_case_name} (alpha = {alpha:.2f})')
         results = []
 
         for exp in range(n_repeats):
@@ -30,16 +51,8 @@ def run_type_I_error_tests(DATASET_TYPE, get_all_distribution_configs, alpha):
             # include only inliers
             X_test_orig, y_test_orig = filter_inliers(X_test_orig, y_test_orig)
 
-            for baseline in [
-                # 'ECOD',
-                'ECODv2',
-                # 'ECODv2Min',
-                # 'GeomMedian',
-                'Mahalanobis',
-                # 'OC-SVM',
-                # 'IForest',
-            ]:
-                for pca_variance_threshold in [None, 1.0]:
+            for baseline in baselines:
+                for pca_variance_threshold in pca_thresholds:
                     if pca_variance_threshold is not None and not apply_PCA_to_baseline(baseline):
                         continue
 
@@ -47,14 +60,7 @@ def run_type_I_error_tests(DATASET_TYPE, get_all_distribution_configs, alpha):
                     X_train, X_test, y_test = apply_PCA_threshold(X_train_orig, X_test_orig, y_test_orig, pca_variance_threshold)
                     clf = get_occ_from_name(baseline)
                     
-                    for cutoff_type in [
-                        'Empirical',
-                        # 'Chi-squared',
-                        # 'Bootstrap',
-                        'Multisplit',
-                        'Multisplit-1_repeat',
-                        'Multisplit-1_median',
-                    ]:
+                    for cutoff_type in cutoffs:
                         if 'Multisplit' in cutoff_type and not apply_multisplit_to_baseline(baseline):
                             continue
 
@@ -67,7 +73,6 @@ def run_type_I_error_tests(DATASET_TYPE, get_all_distribution_configs, alpha):
                             'Method': baseline + (f"+PCA{pca_variance_threshold:.1f}" if pca_variance_threshold is not None else ""),
                             # 'Cutoff': cutoff_type,
                             'Exp': exp + 1,
-                            'alpha': alpha,
                             '#': len(y_test),
                         }
 
@@ -90,10 +95,11 @@ def run_type_I_error_tests(DATASET_TYPE, get_all_distribution_configs, alpha):
         df = pd.DataFrame.from_records(results)
 
         dataset_df = df[df.Dataset == test_case_name]
-        res_df = dataset_df.groupby(['Dataset', 'Method', 'Cutoff', 'alpha'])\
+        res_df = dataset_df.groupby(['Dataset', 'Method', 'Cutoff'])\
             [metric_list] \
             .mean()
-        res_df[f'{alpha_metric} < alpha'] = res_df[alpha_metric] < alpha
+        if alpha_metric is not None:
+            res_df[f'{alpha_metric} < alpha'] = res_df[alpha_metric] < alpha
 
         res_df[metrics_to_multiply_by_100] = \
             (res_df[metrics_to_multiply_by_100] * 100).round(2)
@@ -120,16 +126,13 @@ def run_type_I_error_tests(DATASET_TYPE, get_all_distribution_configs, alpha):
         pivots[metric] = pivot
         pivot = append_mean_row(pivot)
 
-        if metric in ['pi * alpha']:
-            continue
-
         if metric in metrics_to_multiply_by_100:
             pivot = (pivot * 100).round(2)
         else:
             pivot = pivot.round(3)
 
         pivot \
-            .round(3) \
             .to_csv(os.path.join(RESULTS_DIR, f'{DATASET_TYPE}-all-{metric}.csv'))
 
-    append_mean_row(pivots[alpha_metric] < alpha).to_csv(os.path.join(RESULTS_DIR, f'{DATASET_TYPE}-all-{alpha_metric}-alpha.csv'))
+    if alpha_metric is not None:
+        append_mean_row(pivots[alpha_metric] < alpha).to_csv(os.path.join(RESULTS_DIR, f'{DATASET_TYPE}-all-{alpha_metric}-alpha.csv'))
