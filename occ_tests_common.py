@@ -339,7 +339,7 @@ def visualize_scores(scores, p_vals, y_test,
     train_df = pd.DataFrame({
         'Score': train_scores,
         'p-value': train_p_vals,
-        'Class': np.ones_like(train_p_vals),
+        'Class': np.array(['Inlier'] * len(train_scores))
     })
 
     os.makedirs(os.path.join(results_dir, 'img', test_case_name), exist_ok=True)
@@ -348,19 +348,23 @@ def visualize_scores(scores, p_vals, y_test,
         if metric == 'Score' and not plot_scores:
             continue
 
-        _, axs = plt.subplots(1, 2, figsize=(12, 5), sharey=True)
-        sns.histplot(train_df, x=metric, ax=axs[0],
-            hue_order=['Inlier'])
+        sns.set_theme()
+        _, axs = plt.subplots(1, 2, figsize=(14, 6), 
+            sharex=True, sharey=True)
+
+        sns.histplot(train_df, x=metric, hue='Class', ax=axs[0],
+            hue_order=['Inlier'], stat='probability')
         axs[0].set_title('Train')
         sns.histplot(df, x=metric, hue='Class', ax=axs[1],
-            hue_order=['Inlier', 'Outlier'])
+            hue_order=['Inlier', 'Outlier'], stat='probability')
         axs[1].set_title('Test')
         
         plt.suptitle(f'{test_case_name} ({clf_name}) - {metric} distribution')
         plt.savefig(
             os.path.join(results_dir, 'img', test_case_name, f'{metric}-distribution-{clf_name}-{cutoff_type}.png'),
-            dpi=300,
-            bbox_inches='tight'
+            dpi=150,
+            bbox_inches='tight',
+            facecolor='white',
         )
         plt.close()
 
@@ -370,6 +374,7 @@ def visualize_scores(scores, p_vals, y_test,
         # Plot ROC
         fpr, tpr, _ = metrics.roc_curve(y_test, df[metric], pos_label=1)
 
+        sns.set_theme()
         plt.figure(figsize=(8, 6))
         plt.plot(
             fpr,
@@ -388,8 +393,9 @@ def visualize_scores(scores, p_vals, y_test,
 
         plt.savefig(
             os.path.join(results_dir, 'img', test_case_name, f'{metric}-ROC-{clf_name}-{cutoff_type}.png'),
-            dpi=300,
-            bbox_inches='tight'
+            dpi=150,
+            bbox_inches='tight',
+            facecolor='white',
         )
         plt.close()
 
@@ -398,7 +404,8 @@ import matplotlib.pyplot as plt
 
 def use_BH_procedure(p_vals, alpha, pi=None, 
         visualize=False, y_test=None, test_case_name=None,
-        clf_name=None, cutoff_type=None, results_dir=None):
+        clf_name=None, cutoff_type=None, results_dir=None,
+        bh_plot=None, save_plot=False):
     if pi is None:
         fdr_ctl_threshold = alpha
     else:
@@ -417,7 +424,10 @@ def use_BH_procedure(p_vals, alpha, pi=None,
         is_h0_rejected[:num_rejected] = True
 
     if visualize:
-        visualize_BH(p_vals, alpha, pi, y_test, test_case_name, clf_name, cutoff_type, results_dir, fdr_ctl_threshold, sorted_indices, bh_thresholds, is_h0_rejected, rejections)
+        visualize_BH(p_vals, alpha, pi, y_test, test_case_name, clf_name, cutoff_type,
+            results_dir, fdr_ctl_threshold, sorted_indices,
+            bh_thresholds, is_h0_rejected, rejections, 
+            bh_plot, save_plot)
 
     y_pred = np.ones_like(p_vals)
     y_pred[sorted_indices[is_h0_rejected]] = 0
@@ -427,8 +437,11 @@ def visualize_BH(p_vals, alpha, pi,
         y_test, test_case_name,
         clf_name, cutoff_type, results_dir, 
         fdr_ctl_threshold, sorted_indices, 
-        bh_thresholds, is_h0_rejected, rejections):
+        bh_thresholds, is_h0_rejected, rejections,
+        bh_plot, save_plot):
     os.makedirs(os.path.join(results_dir, 'img', test_case_name), exist_ok=True)
+
+    fig, axs = bh_plot
 
     for zoom in [False, True]:
         num_elements = len(y_test)
@@ -438,42 +451,57 @@ def visualize_BH(p_vals, alpha, pi,
                 num_rejected = (np.max(rejections) + 1)
                 num_zoom_elements = max(num_zoom_elements, 2 * num_rejected)
             num_elements = min(num_zoom_elements, len(y_test))
-            
+        
+        plot_row = 0 if pi is None else 1
+        plot_col = 0 if not zoom else 1
+        title = f'BH' + ('+pi' if pi is not None else '') + \
+            f', alpha={fdr_ctl_threshold:.3f}' + \
+            f'{f" (zoomed)" if zoom else ""}'
+
+        ax = axs[plot_row, plot_col]
+        
         x = list(range(len(p_vals)))
         pval_vec = p_vals[sorted_indices]
         outlier_vec = np.where(y_test[sorted_indices] == 0, 'Outlier', 'Inlier')
         rejected_vec = np.where(is_h0_rejected, 'Rejected', 'Not rejected')
 
-        plt.figure(figsize=(12, 8))
+        # plt.figure(figsize=(12, 8))
         sns.scatterplot(x=x[:num_elements], y=pval_vec[:num_elements], 
                 hue=outlier_vec[:num_elements], style=rejected_vec[:num_elements],
                 hue_order=['Inlier', 'Outlier'],
                 style_order=['Not rejected', 'Rejected'],
-                edgecolor='k', linewidth=.3)
+                edgecolor='k', linewidth=.3,
+                ax=ax)
         sns.scatterplot(x=x[:num_elements], y=bh_thresholds[:num_elements], 
                 hue=['B-H threshold'] * num_elements,
                 palette=['r'],
-                edgecolor=None, s=2)
+                edgecolor=None, s=2,
+                ax=ax)
         # sns.lineplot(x=x[:num_elements], y=bh_thresholds[:num_elements],
         #         hue=['B-H threshold'] * num_elements,
         #         palette=['r'],
-        #         linestyle='--')
-            
-        plt.title(f'{test_case_name} - {clf_name}, {cutoff_type}, alpha={alpha}' + \
-                f'{f" (+pi => alpha={fdr_ctl_threshold:.3f}" if pi is not None else ""}' + \
-                f'{f" (zoomed)" if zoom else ""}')
-        plt.ylim(0, None)
+        #         linestyle='--',
+        #         ax=ax)
         
-        legend = plt.legend()
+        # ax.set_title(f'{test_case_name} - {clf_name}, {cutoff_type}, alpha={alpha}' + \
+        #         f'{f" (+pi => alpha={fdr_ctl_threshold:.3f}" if pi is not None else ""}' + \
+        #         f'{f" (zoomed)" if zoom else ""}')
+        ax.set_title(title)
+        ax.set_ylim(0, None)
+        
+        legend = ax.legend()
         legend.legendHandles[-1]._sizes = [8.]
 
-        plt.savefig(
+    if save_plot:
+        fig.tight_layout()
+        fig.savefig(
                 os.path.join(results_dir, 'img', test_case_name, 
-                    f'{clf_name}-{cutoff_type}{"_zoom" if zoom else ""}.png'),
+                    f'{clf_name}-{cutoff_type}.png'),
                 dpi=300,
-                bbox_inches='tight'
+                bbox_inches='tight',
+                facecolor='white',
             )
-        plt.close()
+        plt.close(fig)
 
 # %%
 import pandas as pd

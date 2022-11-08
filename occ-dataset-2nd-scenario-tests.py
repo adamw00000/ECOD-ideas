@@ -59,6 +59,16 @@ datasets = [
 
 metric_list = ['pi * alpha', 'AUC', 'ACC', 'PRE', 'REC', 'F1', '#', '#FD', '#D', 'FDR']
 
+def prepare_metrics(y_test, y_pred, scores, occ_metrics, metric_list):
+    method_metrics = dict(occ_metrics)
+    test_metrics = get_metrics(y_test, y_pred, scores)
+
+    for metric in metric_list:
+        if metric in method_metrics and metric not in test_metrics:
+            continue
+        method_metrics[metric] = test_metrics[metric]
+    return method_metrics
+
 for alpha in [0.05, 0.25, 0.5]:
     full_results = []
 
@@ -71,6 +81,7 @@ for alpha in [0.05, 0.25, 0.5]:
         results = []
 
         for exp in range(n_repeats):
+            np.random.seed(exp)
             # Load data
             X, y = occ_datasets.load_dataset(dataset, format)
             X_train_orig, X_test_orig, y_test_orig = occ_datasets.split_occ_dataset(X, y, train_ratio=0.6)
@@ -89,6 +100,7 @@ for alpha in [0.05, 0.25, 0.5]:
                     if pca_variance_threshold is not None and not apply_PCA_to_baseline(baseline):
                         continue
 
+                    np.random.seed(exp)
                     X_train, X_test, y_test = apply_PCA_threshold(X_train_orig, X_test_orig, y_test_orig, pca_variance_threshold)
                     clf = get_occ_from_name(baseline)
                     
@@ -97,37 +109,46 @@ for alpha in [0.05, 0.25, 0.5]:
                         # 'Chi-squared',
                         # 'Bootstrap',
                         'Multisplit',
-                        'Multisplit+BH',
-                        'Multisplit+BH+pi',
                         'Multisplit-1_repeat',
-                        'Multisplit-1_repeat+BH',
-                        'Multisplit-1_repeat+BH+pi',
                         'Multisplit-1_median',
-                        'Multisplit-1_median+BH',
-                        'Multisplit-1_median+BH+pi',
                     ]:
                         if 'Multisplit' in cutoff_type and not apply_multisplit_to_baseline(baseline):
                             continue
                         
-                        if 'Multisplit' in cutoff_type:
-                            if '1_repeat' in cutoff_type:
-                                multisplit_cal_scores = prepare_multisplit_cal_scores(clf, X_train, resampling_repeats=1)
-                            else:
-                                multisplit_cal_scores = prepare_multisplit_cal_scores(clf, X_train, resampling_repeats=resampling_repeats)
-
+                        np.random.seed(exp)
                         clf.fit(X_train)
                         scores = clf.score_samples(X_test)
+
+                        occ_metrics = {
+                            'Dataset': test_case_name,
+                            'Method': baseline + (f"+PCA{pca_variance_threshold:.1f}" if pca_variance_threshold is not None else ""),
+                            # 'Cutoff': cutoff_type,
+                            'Exp': exp + 1,
+                            'alpha': alpha,
+                            'pi * alpha': inlier_rate * alpha,
+                            '#': len(y_test),
+                        }
 
                         if cutoff_type == 'Empirical':
                             emp_quantile = np.quantile(scores, q=1 - inlier_rate)
                             y_pred = np.where(scores > emp_quantile, 1, 0)
+
+                            occ_metrics['Cutoff'] = cutoff_type
+                            method_metrics = prepare_metrics(y_test, y_pred, scores, occ_metrics, metric_list)
+                            results.append(method_metrics)
+                            full_results.append(method_metrics)
                         elif 'Multisplit' in cutoff_type:
+                            visualize = exp == 0 and pca_variance_threshold is None
+
+                            np.random.seed(exp)
+                            multisplit_cal_scores = prepare_multisplit_cal_scores(clf, X_train,
+                                resampling_repeats=1 if '1_repeat' in cutoff_type else resampling_repeats)
+                            
                             p_vals = get_multisplit_p_values(scores, multisplit_cal_scores, 
                                 median_multiplier=1 if '1_median' in cutoff_type else 2) # 2 should be correct
                             y_pred = np.where(p_vals < alpha, 0, 1)
 
-                            if exp == 0 and '+pi' in cutoff_type and pca_variance_threshold is None \
-                                    and '1_repeat' not in cutoff_type:
+                            if visualize:
                                 train_scores = clf.score_samples(X_train)
                                 train_p_vals = get_multisplit_p_values(train_scores, multisplit_cal_scores, 
                                     median_multiplier=1 if '1_median' in cutoff_type else 2)
@@ -138,46 +159,42 @@ for alpha in [0.05, 0.25, 0.5]:
                                     baseline,
                                     cutoff_type,
                                     RESULTS_DIR,
-                                    plot_scores=cutoff_type == 'Multisplit+BH+pi')
-
-                            if 'BH' in cutoff_type:
-                                if 'pi' in cutoff_type:
-                                    pi=inlier_rate
-                                else:
-                                    pi=None
+                                    plot_scores=cutoff_type == 'Multisplit')
                                 
-                                if exp == 0 and pca_variance_threshold is None \
-                                        and '1_repeat' not in cutoff_type:
-                                    y_pred = use_BH_procedure(p_vals, alpha, pi,
-                                        visualize=True,
-                                        y_test=y_test,
-                                        test_case_name=test_case_name,
-                                        clf_name=baseline,
-                                        cutoff_type=cutoff_type,
-                                        results_dir=RESULTS_DIR)
-                                else:
-                                    y_pred = use_BH_procedure(p_vals, alpha, pi)
+                                sns.set_theme()
+                                bh_plot = plt.subplots(2, 2, figsize=(24, 16))
+                                plt.suptitle(f'{test_case_name} - {baseline}, {cutoff_type}')
 
-                        test_metrics = get_metrics(y_test, y_pred, scores)
+                            bh_plots = 0
+                            for use_bh, use_pi in [(False, False), (True, False), (True, True)]:
+                                cutoff_name = cutoff_type + ('+BH' if use_bh else '') + ('+pi' if use_pi else '')
 
-                        # print(f'{dataset}.{format}: {baseline}{f"+PCA{pca_variance_threshold:.1f}" if pca_variance_threshold is not None else ""} ({cutoff_type}, {exp+1}/{n_repeats})' + \
-                        #     f' ||| AUC: {100 * auc:3.2f}, ACC: {100 * acc:3.2f}, F1: {100 * f1:3.2f}, FDR: {fdr:.3f}')
-                        occ_metrics = {
-                            'Dataset': test_case_name,
-                            'Method': baseline + (f"+PCA{pca_variance_threshold:.1f}" if pca_variance_threshold is not None else ""),
-                            'Cutoff': cutoff_type,
-                            'Exp': exp + 1,
-                            'alpha': alpha,
-                            'pi * alpha': inlier_rate * alpha,
-                            '#': len(y_pred),
-                        }
-                        for metric in metric_list:
-                            if metric in occ_metrics and metric not in test_metrics:
-                                continue
-                            occ_metrics[metric] = test_metrics[metric]
-                        
-                        results.append(occ_metrics)
-                        full_results.append(occ_metrics)
+                                if use_bh:
+                                    if use_pi:
+                                        pi=inlier_rate
+                                    else:
+                                        pi=None
+                                    
+                                    np.random.seed(exp)
+                                    if visualize:
+                                        bh_plots += 1
+
+                                        y_pred = use_BH_procedure(p_vals, alpha, pi,
+                                            visualize=True,
+                                            y_test=y_test,
+                                            test_case_name=test_case_name,
+                                            clf_name=baseline,
+                                            cutoff_type=cutoff_type,
+                                            results_dir=RESULTS_DIR,
+                                            bh_plot=bh_plot,
+                                            save_plot=(bh_plots == 2))
+                                    else:
+                                        y_pred = use_BH_procedure(p_vals, alpha, pi)
+                                
+                                occ_metrics['Cutoff'] = cutoff_name
+                                method_metrics = prepare_metrics(y_test, y_pred, scores, occ_metrics, metric_list)
+                                results.append(method_metrics)
+                                full_results.append(method_metrics)
         
         df = pd.DataFrame.from_records(results)
 
