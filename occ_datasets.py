@@ -64,6 +64,41 @@ MAT_DATASETS = {
     'Vertebral': 'vertebral.mat',
 }
 
+ECOD_dataset_list = [
+    # .mat
+    ('Arrhythmia', 'mat'),
+    ('Breastw', 'mat'),
+    ('Cardio', 'mat'),
+    ('Ionosphere', 'mat'),
+    ('Lympho', 'mat'),
+    ('Mammography', 'mat'),
+    ('Optdigits', 'mat'),
+    ('Pima', 'mat'),
+    ('Satellite', 'mat'),
+    ('Satimage-2', 'mat'),
+    ('Shuttle', 'mat'),
+    ('Speech', 'mat'),
+    ('WBC', 'mat'),
+    ('Wine', 'mat'),
+    # .arff
+    ('Arrhythmia', 'arff'),
+    ('Cardiotocography', 'arff'),
+    ('HeartDisease', 'arff'),
+    ('Hepatitis', 'arff'),
+    ('InternetAds', 'arff'),
+    ('Ionosphere', 'arff'),
+    ('KDDCup99', 'arff'),
+    ('Lymphography', 'arff'),
+    ('Pima', 'arff'),
+    ('Shuttle', 'arff'),
+    ('SpamBase', 'arff'),
+    ('Stamps', 'arff'),
+    ('Waveform', 'arff'),
+    ('WBC', 'arff'),
+    ('WDBC', 'arff'),
+    ('WPBC', 'arff'),
+]
+
 def load_dataset(name, format):
     if format == 'arff':
         if name not in ARFF_DATASETS:

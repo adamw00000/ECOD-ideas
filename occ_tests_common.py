@@ -319,6 +319,16 @@ def get_metrics(y_test, y_pred, scores, one_class_only=False):
         '#D': detections,
     }
 
+def prepare_metrics(y_test, y_pred, scores, occ_metrics, metric_list):
+    method_metrics = dict(occ_metrics)
+    test_metrics = get_metrics(y_test, y_pred, scores)
+
+    for metric in metric_list:
+        if metric in method_metrics and metric not in test_metrics:
+            continue
+        method_metrics[metric] = test_metrics[metric]
+    return method_metrics
+
 # %%
 import os
 import matplotlib.pyplot as plt
@@ -359,9 +369,9 @@ def visualize_scores(scores, p_vals, y_test,
             hue_order=['Inlier', 'Outlier'], stat='probability')
         axs[1].set_title('Test')
         
-        plt.suptitle(f'{test_case_name} ({clf_name}) - {metric} distribution')
+        plt.suptitle(f'{test_case_name} ({clf_name}, {cutoff_type}) - {metric} distribution')
         plt.savefig(
-            os.path.join(results_dir, 'img', test_case_name, f'{metric}-distribution-{clf_name}-{cutoff_type}.png'),
+            os.path.join(results_dir, 'img', test_case_name, f'distribution-{metric}-{clf_name}-{cutoff_type}.png'),
             dpi=150,
             bbox_inches='tight',
             facecolor='white',
@@ -392,7 +402,7 @@ def visualize_scores(scores, p_vals, y_test,
         plt.legend(loc="lower right")
 
         plt.savefig(
-            os.path.join(results_dir, 'img', test_case_name, f'{metric}-ROC-{clf_name}-{cutoff_type}.png'),
+            os.path.join(results_dir, 'img', test_case_name, f'ROC-{metric}-{clf_name}-{cutoff_type}.png'),
             dpi=150,
             bbox_inches='tight',
             facecolor='white',
@@ -496,7 +506,7 @@ def visualize_BH(p_vals, alpha, pi,
         fig.tight_layout()
         fig.savefig(
                 os.path.join(results_dir, 'img', test_case_name, 
-                    f'{clf_name}-{cutoff_type}.png'),
+                    f'BH-{clf_name}-{cutoff_type}.png'),
                 dpi=300,
                 bbox_inches='tight',
                 facecolor='white',
