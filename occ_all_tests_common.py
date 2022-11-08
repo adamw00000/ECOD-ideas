@@ -276,7 +276,7 @@ def apply_multisplit_to_baseline(baseline):
 # %%
 from sklearn import metrics
 
-def get_metrics(y_test, y_pred, scores, one_class_only=False):
+def get_metrics(y_test, y_pred, scores, pos_class_only=False):
     false_detections = np.sum((y_pred == 0) & (y_test == 1))
     detections = np.sum(y_pred == 0)
     if detections == 0:
@@ -284,7 +284,7 @@ def get_metrics(y_test, y_pred, scores, one_class_only=False):
     else:
         fdr = false_detections / detections
 
-    if not one_class_only:
+    if not pos_class_only:
         auc = metrics.roc_auc_score(y_test, scores)
     else:
         auc = np.nan
@@ -319,9 +319,9 @@ def get_metrics(y_test, y_pred, scores, one_class_only=False):
         '#D': detections,
     }
 
-def prepare_metrics(y_test, y_pred, scores, occ_metrics, metric_list):
+def prepare_metrics(y_test, y_pred, scores, occ_metrics, metric_list, pos_class_only=False):
     method_metrics = dict(occ_metrics)
-    test_metrics = get_metrics(y_test, y_pred, scores)
+    test_metrics = get_metrics(y_test, y_pred, scores, pos_class_only=pos_class_only)
 
     for metric in metric_list:
         if metric in method_metrics and metric not in test_metrics:

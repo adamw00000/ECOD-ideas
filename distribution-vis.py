@@ -1,9 +1,8 @@
 # %%
 import os
-from occ_tests_common import *
+from occ_all_tests_common import *
 import numpy as np
 import matplotlib.pyplot as plt
-
 
 n=1_000
 dim=2
