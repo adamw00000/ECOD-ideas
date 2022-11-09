@@ -8,7 +8,7 @@ from IPython.display import display
 
 n_repeats = 10
 resampling_repeats = 10
-metric_list = ['AUC', 'ACC', 'PRE', 'REC', 'F1', 'T1E', 'FRR', 'FDR']
+metric_list = ['AUC', 'ACC', 'PRE', 'REC', 'F1', 'T1E', 'FOR', 'FDR']
 alpha_metric = None
 
 test_description = 'General tests'

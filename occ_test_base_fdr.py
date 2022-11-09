@@ -9,7 +9,7 @@ from IPython.display import display
 n_repeats = 10
 resampling_repeats = 10
 metric_list = ['AUC', 'ACC', 'PRE', 'REC', 'F1', 
-    'T1E', 'FRR', '#', '#FD', '#D', 'FDR']
+    'T1E', 'FOR', '#', '#FD', '#D', 'FDR']
 alpha_metric = 'FDR'
 
 test_description = 'FDR tests'

@@ -301,9 +301,9 @@ def get_metrics(y_test, y_pred, scores, pos_class_only=False):
     false_rejections = np.sum((y_pred == 1) & (y_test == 0)) # False rejections == negative samples predicted to be positive
     rejections = np.sum(y_pred == 1) # All rejections == samples predicted to be positive
     if rejections == 0:
-        frr = np.nan
+        false_omission_rate = np.nan
     else:
-        frr = false_rejections / rejections
+        false_omission_rate = false_rejections / rejections
 
     return {
         'AUC': auc,
@@ -312,7 +312,7 @@ def get_metrics(y_test, y_pred, scores, pos_class_only=False):
         'REC': rec,
         'F1': f1,
         'FDR': fdr,
-        'FRR': frr,
+        'FOR': false_omission_rate,
         'T1E': t1e, # Type I Error
 
         '#FD': false_detections,
@@ -532,3 +532,5 @@ def round_and_multiply_metric(df, metric):
     else:
         df = df.round(3)
     return df
+
+# %%
