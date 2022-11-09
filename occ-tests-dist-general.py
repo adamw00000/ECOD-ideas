@@ -24,3 +24,5 @@ def get_all_distribution_configs():
     return all_configs
 
 run_general_tests(DATASET_TYPE, get_all_distribution_configs)
+
+# %%

@@ -37,7 +37,7 @@ def run_general_tests(DATASET_TYPE, get_all_distribution_configs, alpha=None):
     os.makedirs(RESULTS_DIR, exist_ok=True)
 
     for (test_case_name, get_dataset_function) in get_all_distribution_configs():
-        print(f'{test_description}: {test_case_name} (alpha = {alpha:.2f})')
+        print(f'{test_description}: {test_case_name}')
         results = []
 
         for exp in range(n_repeats):

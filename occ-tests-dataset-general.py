@@ -10,7 +10,7 @@ datasets = occ_datasets.ECOD_dataset_list
 #     ('Arrhythmia', 'mat'),
 # ]
 
-def get_all_distribution_configs(train_ratio=0.6):
+def get_all_dataset_configs(train_ratio=0.6):
     all_configs = []
 
     for (dataset, format) in datasets:
@@ -25,4 +25,6 @@ def get_all_distribution_configs(train_ratio=0.6):
     
     return all_configs
 
-run_general_tests(DATASET_TYPE, get_all_distribution_configs)
+run_general_tests(DATASET_TYPE, get_all_dataset_configs)
+
+# %%
