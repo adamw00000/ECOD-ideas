@@ -25,8 +25,8 @@ cutoffs = [
     'Empirical',
     # 'Chi-squared',
     # 'Bootstrap',
-    'Multisplit',
-    'Multisplit-1_repeat',
+    # 'Multisplit',
+    # 'Multisplit-1_repeat',
     'Multisplit-1_median',
 ]
 pca_thresholds = [None, 1.0]

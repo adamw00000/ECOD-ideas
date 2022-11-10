@@ -214,7 +214,8 @@ def apply_PCA_threshold(X_train_orig, X_test_orig, y_test_orig, pca_variance_thr
     return X_train, X_test, y_test
 
 def apply_PCA_to_baseline(baseline):
-    return baseline in ['ECODv2', 'Mahalanobis']
+    # return baseline in ['ECODv2', 'Mahalanobis']
+    return baseline in ['Mahalanobis']
 
 # %%
 def prepare_resampling_threshold(clf, X_train, resampling_repeats, inlier_rate, method):
