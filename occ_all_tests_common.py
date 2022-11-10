@@ -243,34 +243,6 @@ def prepare_resampling_threshold(clf, X_train, resampling_repeats, inlier_rate, 
     return resampling_threshold
 
 # %%
-def prepare_multisplit_cal_scores(clf, X_train, resampling_repeats):
-    N = len(X_train)
-    cal_scores_all = np.zeros((resampling_repeats, N - int(N/2)))
-
-    for i in range(resampling_repeats):
-        multisplit_samples = np.random.choice(range(N), size=int(N/2), replace=False)
-        is_multisplit_sample = np.isin(range(N), multisplit_samples)
-        X_multi_train, X_multi_cal = X_train[is_multisplit_sample], X_train[~is_multisplit_sample]
-        
-        clf.fit(X_multi_train)
-        cal_scores = clf.score_samples(X_multi_cal)
-        cal_scores_all[i, :] = cal_scores
-    
-    return cal_scores_all
-
-def get_multisplit_p_values(scores, multisplit_cal_scores, median_multiplier=2):
-    resampling_repeats = len(multisplit_cal_scores)
-
-    p_vals_all = np.zeros((resampling_repeats, len(scores)))
-    for i in range(resampling_repeats):
-        cal_scores = multisplit_cal_scores[i, :]
-        num_smaller_cal_scores = (scores > cal_scores.reshape(-1, 1)).sum(axis=0)
-        p_vals = (num_smaller_cal_scores + 1) / (len(cal_scores) + 1)
-        p_vals_all[i, :] = p_vals
-
-    p_vals = median_multiplier * np.median(p_vals_all, axis=0)
-    return p_vals
-
 def apply_multisplit_to_baseline(baseline):
     return baseline in ['ECODv2', 'Mahalanobis']
 
@@ -533,37 +505,3 @@ def round_and_multiply_metric(df, metric):
     else:
         df = df.round(3)
     return df
-
-# %%
-import scipy.stats
-
-def apply_cutoff(scores, cutoff_type, X_train, clf, inlier_rate, alpha, exp, resampling_repeats):
-    np.random.seed(exp)
-    multisplit_cal_scores = None
-    p_vals = None
-
-    if cutoff_type == 'Empirical':
-        emp_quantile = np.quantile(scores, q=1 - inlier_rate)
-        y_pred = np.where(scores > emp_quantile, 1, 0)
-    elif cutoff_type == 'Chi-squared':
-        d = X_train.shape[1]
-        chi_quantile = -scipy.stats.chi2.ppf(1 - inlier_rate, 2 * d)
-        y_pred = np.where(scores > chi_quantile, 1, 0)
-    elif '_threshold' in cutoff_type:
-        if 'Bootstrap' in cutoff_type:
-            resampling_method = 'Bootstrap'
-        else:
-            resampling_method = 'Multisplit'
-        resampling_threshold = prepare_resampling_threshold(clf, X_train, resampling_repeats, inlier_rate, method=resampling_method)
-        y_pred = np.where(scores > resampling_threshold, 1, 0)
-    elif 'Multisplit' in cutoff_type:
-        np.random.seed(exp)
-        multisplit_cal_scores = prepare_multisplit_cal_scores(clf, X_train,
-                                resampling_repeats=1 if '1_repeat' in cutoff_type else resampling_repeats)              
-        p_vals = get_multisplit_p_values(scores, multisplit_cal_scores,
-                                median_multiplier=1 if '1_median' in cutoff_type else 2) # 2 should be correct
-        y_pred = np.where(p_vals < alpha, 0, 1)
-    else:
-        raise NotImplementedError('Unknown cutoff type')
-    
-    return y_pred, multisplit_cal_scores, p_vals

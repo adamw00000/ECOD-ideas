@@ -1,10 +1,12 @@
 from occ_all_tests_common import *
+from occ_cutoffs import *
 
 import os
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 from IPython.display import display
+from typing import List
 
 n_repeats = 10
 resampling_repeats = 10
@@ -23,14 +25,16 @@ baselines = [
     # 'OC-SVM',
     # 'IForest',
 ]
-cutoffs = [
-    'Empirical',
-    # 'Chi-squared',
-    # 'Bootstrap',
-    # 'Multisplit',
-    # 'Multisplit-1_repeat',
-    'Multisplit-1_median',
-]
+def get_cutoffs(inlier_rate, dim, resampling_repeats, X_train, clf, alpha) -> List[Cutoff]:
+    return [
+        EmpiricalCutoff(inlier_rate),
+        # ChiSquaredCutoff(inlier_rate, dim),
+        # BootstrapThresholdCutoff(inlier_rate, resampling_repeats, X_train, clf),
+        MultisplitThresholdCutoff(inlier_rate, resampling_repeats, X_train, clf),
+        # MultisplitCutoff(inlier_rate, resampling_repeats, X_train, clf, alpha, median_multiplier=2),
+        # MultisplitCutoff(inlier_rate, 1, X_train, clf, alpha, median_multiplier=2),
+        MultisplitCutoff(inlier_rate, resampling_repeats, X_train, clf, alpha, median_multiplier=1),
+    ]
 pca_thresholds = [None, 1.0]
 
 def run_fdr_tests(DATASET_TYPE, get_all_distribution_configs, alpha):
@@ -58,8 +62,8 @@ def run_fdr_tests(DATASET_TYPE, get_all_distribution_configs, alpha):
                     X_train, X_test, y_test = apply_PCA_threshold(X_train_orig, X_test_orig, y_test_orig, pca_variance_threshold)
                     clf = get_occ_from_name(baseline)
                     
-                    for cutoff_type in cutoffs:
-                        if 'Multisplit' in cutoff_type and not apply_multisplit_to_baseline(baseline):
+                    for cutoff in get_cutoffs(inlier_rate, dim, resampling_repeats, X_train, clf, alpha):
+                        if not apply_multisplit_to_baseline(baseline) and (isinstance(cutoff, MultisplitCutoff) or isinstance(cutoff, MultisplitThresholdCutoff)):
                             continue
 
                         np.random.seed(exp)
@@ -74,31 +78,32 @@ def run_fdr_tests(DATASET_TYPE, get_all_distribution_configs, alpha):
                             '#': len(y_test),
                         }
 
-                        y_pred, multisplit_cal_scores, p_vals = \
-                            apply_cutoff(scores, cutoff_type, X_train, clf, inlier_rate, alpha, exp, resampling_repeats)
+                        y_pred = cutoff.fit_apply(scores)
 
-                        if 'Multisplit' in cutoff_type:
+                        if isinstance(cutoff, MultisplitCutoff):
                             visualize = exp == 0 and pca_variance_threshold is None
                             if visualize:
+                                p_vals = cutoff.get_p_vals(scores)
+
                                 train_scores = clf.score_samples(X_train)
-                                train_p_vals = get_multisplit_p_values(train_scores, multisplit_cal_scores, 
-                                    median_multiplier=1 if '1_median' in cutoff_type else 2)
+                                train_p_vals = cutoff.get_p_vals(train_scores)
 
                                 visualize_scores(scores, p_vals, y_test,
                                     train_scores, train_p_vals,
                                     test_case_name,
                                     baseline,
-                                    cutoff_type,
+                                    cutoff.cutoff_type,
                                     RESULTS_DIR,
-                                    plot_scores=cutoff_type == 'Multisplit')
+                                    plot_scores=(cutoff.cutoff_type == 'Multisplit')
+                                )
                                 
                                 sns.set_theme()
                                 bh_plot = plt.subplots(2, 2, figsize=(24, 16))
-                                plt.suptitle(f'{test_case_name} - {baseline}, {cutoff_type}')
+                                plt.suptitle(f'{test_case_name} - {baseline}, {cutoff.cutoff_type}')
 
                             bh_plots = 0
                             for use_bh, use_pi in [(False, False), (True, False), (True, True)]:
-                                cutoff_name = cutoff_type + ('+BH' if use_bh else '') + ('+pi' if use_pi else '')
+                                cutoff_name = cutoff.cutoff_type + ('+BH' if use_bh else '') + ('+pi' if use_pi else '')
 
                                 if use_bh:
                                     if use_pi:
@@ -115,7 +120,7 @@ def run_fdr_tests(DATASET_TYPE, get_all_distribution_configs, alpha):
                                             y_test=y_test,
                                             test_case_name=test_case_name,
                                             clf_name=baseline,
-                                            cutoff_type=cutoff_type,
+                                            cutoff_type=cutoff.cutoff_type,
                                             results_dir=RESULTS_DIR,
                                             bh_plot=bh_plot,
                                             save_plot=(bh_plots == 2))
