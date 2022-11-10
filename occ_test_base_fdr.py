@@ -74,25 +74,11 @@ def run_fdr_tests(DATASET_TYPE, get_all_distribution_configs, alpha):
                             '#': len(y_test),
                         }
 
-                        if cutoff_type == 'Empirical':
-                            emp_quantile = np.quantile(scores, q=1 - inlier_rate)
-                            y_pred = np.where(scores > emp_quantile, 1, 0)
+                        y_pred, multisplit_cal_scores, p_vals = \
+                            apply_cutoff(scores, cutoff_type, X_train, clf, inlier_rate, alpha, exp, resampling_repeats)
 
-                            occ_metrics['Cutoff'] = cutoff_type
-                            method_metrics = prepare_metrics(y_test, y_pred, scores, occ_metrics, metric_list)
-                            results.append(method_metrics)
-                            full_results.append(method_metrics)
-                        elif 'Multisplit' in cutoff_type:
+                        if 'Multisplit' in cutoff_type:
                             visualize = exp == 0 and pca_variance_threshold is None
-
-                            np.random.seed(exp)
-                            multisplit_cal_scores = prepare_multisplit_cal_scores(clf, X_train,
-                                resampling_repeats=1 if '1_repeat' in cutoff_type else resampling_repeats)
-                            
-                            p_vals = get_multisplit_p_values(scores, multisplit_cal_scores,
-                                median_multiplier=1 if '1_median' in cutoff_type else 2) # 2 should be correct
-                            y_pred = np.where(p_vals < alpha, 0, 1)
-
                             if visualize:
                                 train_scores = clf.score_samples(X_train)
                                 train_p_vals = get_multisplit_p_values(train_scores, multisplit_cal_scores, 

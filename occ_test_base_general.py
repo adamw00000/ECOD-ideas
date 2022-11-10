@@ -71,22 +71,7 @@ def run_general_tests(DATASET_TYPE, get_all_distribution_configs, alpha=None):
                             '#': len(y_test),
                         }
 
-                        if cutoff_type == 'Empirical':
-                            emp_quantile = np.quantile(scores, q=1 - inlier_rate)
-                            y_pred = np.where(scores > emp_quantile, 1, 0)
-                        elif cutoff_type == 'Chi-squared':
-                            d = X_test.shape[1]
-                            chi_quantile = -scipy.stats.chi2.ppf(1 - inlier_rate, 2 * d)
-                            y_pred = np.where(scores > chi_quantile, 1, 0)
-                        elif '_threshold' in cutoff_type:
-                            if 'Bootstrap' in cutoff_type:
-                                resampling_method = 'Bootstrap'
-                            else:
-                                resampling_method = 'Multisplit'
-                            
-                            np.random.seed(exp)
-                            resampling_threshold = prepare_resampling_threshold(clf, X_train, resampling_repeats, inlier_rate, method=resampling_method)
-                            y_pred = np.where(scores > resampling_threshold, 1, 0)
+                        y_pred, _, _ = apply_cutoff(scores, cutoff_type, X_train, clf, inlier_rate, alpha, exp, resampling_repeats)
 
                         occ_metrics['Cutoff'] = cutoff_type
                         method_metrics = prepare_metrics(y_test, y_pred, scores, occ_metrics, metric_list)

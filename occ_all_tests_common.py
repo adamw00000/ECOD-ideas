@@ -535,3 +535,35 @@ def round_and_multiply_metric(df, metric):
     return df
 
 # %%
+import scipy.stats
+
+def apply_cutoff(scores, cutoff_type, X_train, clf, inlier_rate, alpha, exp, resampling_repeats):
+    np.random.seed(exp)
+    multisplit_cal_scores = None
+    p_vals = None
+
+    if cutoff_type == 'Empirical':
+        emp_quantile = np.quantile(scores, q=1 - inlier_rate)
+        y_pred = np.where(scores > emp_quantile, 1, 0)
+    elif cutoff_type == 'Chi-squared':
+        d = X_train.shape[1]
+        chi_quantile = -scipy.stats.chi2.ppf(1 - inlier_rate, 2 * d)
+        y_pred = np.where(scores > chi_quantile, 1, 0)
+    elif '_threshold' in cutoff_type:
+        if 'Bootstrap' in cutoff_type:
+            resampling_method = 'Bootstrap'
+        else:
+            resampling_method = 'Multisplit'
+        resampling_threshold = prepare_resampling_threshold(clf, X_train, resampling_repeats, inlier_rate, method=resampling_method)
+        y_pred = np.where(scores > resampling_threshold, 1, 0)
+    elif 'Multisplit' in cutoff_type:
+        np.random.seed(exp)
+        multisplit_cal_scores = prepare_multisplit_cal_scores(clf, X_train,
+                                resampling_repeats=1 if '1_repeat' in cutoff_type else resampling_repeats)              
+        p_vals = get_multisplit_p_values(scores, multisplit_cal_scores,
+                                median_multiplier=1 if '1_median' in cutoff_type else 2) # 2 should be correct
+        y_pred = np.where(p_vals < alpha, 0, 1)
+    else:
+        raise NotImplementedError('Unknown cutoff type')
+    
+    return y_pred, multisplit_cal_scores, p_vals
