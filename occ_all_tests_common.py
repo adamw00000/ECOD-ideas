@@ -215,7 +215,7 @@ def apply_PCA_threshold(X_train_orig, X_test_orig, y_test_orig, pca_variance_thr
 
 def apply_PCA_to_baseline(baseline):
     # return baseline in ['ECODv2', 'Mahalanobis']
-    return baseline in ['Mahalanobis']
+    return baseline in ['ECODv2']
 
 # %%
 def prepare_resampling_threshold(clf, X_train, resampling_repeats, inlier_rate, method):
@@ -249,8 +249,8 @@ def apply_multisplit_to_baseline(baseline):
 # %%
 from sklearn import metrics
 
-def get_metrics(y_test, y_pred, scores, pos_class_only=False):
-    false_detections = np.sum((y_pred == 0) & (y_test == 1))
+def get_metrics(y_true, y_pred, scores, pos_class_only=False):
+    false_detections = np.sum((y_pred == 0) & (y_true == 1))
     detections = np.sum(y_pred == 0)
     if detections == 0:
         fdr = np.nan
@@ -258,25 +258,30 @@ def get_metrics(y_test, y_pred, scores, pos_class_only=False):
         fdr = false_detections / detections
 
     if not pos_class_only:
-        auc = metrics.roc_auc_score(y_test, scores)
+        auc = metrics.roc_auc_score(y_true, scores)
     else:
         auc = np.nan
     
-    acc = metrics.accuracy_score(y_test, y_pred)
-    pre = metrics.precision_score(y_test, y_pred, zero_division=0)
-    rec = metrics.recall_score(y_test, y_pred, zero_division=0)
-    f1 = metrics.f1_score(y_test, y_pred, zero_division=0)
+    acc = metrics.accuracy_score(y_true, y_pred)
+    pre = metrics.precision_score(y_true, y_pred, zero_division=0)
+    rec = metrics.recall_score(y_true, y_pred, zero_division=0)
+    f1 = metrics.f1_score(y_true, y_pred, zero_division=0)
 
-    inlier_idx = np.where(y_test == 1)[0]
-    t1e = 1 - np.mean(y_pred[inlier_idx] == y_test[inlier_idx])
+    inlier_idx = np.where(y_true == 1)[0]
+    t1e = 1 - np.mean(y_pred[inlier_idx] == y_true[inlier_idx])
 
     # important for PU
-    false_rejections = np.sum((y_pred == 1) & (y_test == 0)) # False rejections == negative samples predicted to be positive
+    false_rejections = np.sum((y_pred == 1) & (y_true == 0)) # False rejections == negative samples predicted to be positive
     rejections = np.sum(y_pred == 1) # All rejections == samples predicted to be positive
     if rejections == 0:
         false_omission_rate = np.nan
     else:
         false_omission_rate = false_rejections / rejections
+
+    if np.sum(y_true == 0):
+        fnr = false_rejections / np.sum(y_true == 0)
+    else:
+        fnr = np.nan
 
     return {
         'AUC': auc,
@@ -286,6 +291,7 @@ def get_metrics(y_test, y_pred, scores, pos_class_only=False):
         'F1': f1,
         'FDR': fdr,
         'FOR': false_omission_rate,
+        'FNR': fnr,
         'T1E': t1e, # Type I Error
 
         '#FD': false_detections,
