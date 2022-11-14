@@ -51,31 +51,30 @@ def run_general_tests(DATASET_TYPE, get_all_distribution_configs, alpha=None):
             X_train_orig, X_test_orig, y_test_orig = get_dataset_function()
             inlier_rate = np.mean(y_test_orig)
 
-            for baseline in baselines:
+            for clf_name in baselines:
                 for pca_variance_threshold in pca_thresholds:
-                    if pca_variance_threshold is not None and not apply_PCA_to_baseline(baseline):
+                    if pca_variance_threshold is not None and not apply_PCA_to_baseline(clf_name):
                         continue
 
                     np.random.seed(exp)
                     X_train, X_test, y_test = apply_PCA_threshold(X_train_orig, X_test_orig, y_test_orig, pca_variance_threshold)
-                    clf = get_occ_from_name(baseline)
-                    
-                    for cutoff in get_cutoffs(inlier_rate, dim, resampling_repeats, X_train, clf, alpha):
-                        if not apply_multisplit_to_baseline(baseline) and (isinstance(cutoff, MultisplitCutoff) or isinstance(cutoff, MultisplitThresholdCutoff)):
-                            continue
+                    clf = get_occ_from_name(clf_name)
 
-                        np.random.seed(exp)
-                        clf.fit(X_train)
-                        scores = clf.score_samples(X_test)
+                    clf.fit(X_train)
+                    scores = clf.score_samples(X_test)
+                    for cutoff in get_cutoffs(inlier_rate, dim, resampling_repeats, X_train, clf, alpha):
+                        if not apply_multisplit_to_baseline(clf_name) and (isinstance(cutoff, MultisplitCutoff) or isinstance(cutoff, MultisplitThresholdCutoff)):
+                            continue
 
                         occ_metrics = {
                             'Dataset': test_case_name,
-                            'Method': baseline + (f"+PCA{pca_variance_threshold:.1f}" if pca_variance_threshold is not None else ""),
+                            'Method': clf_name + (f"+PCA{pca_variance_threshold:.1f}" if pca_variance_threshold is not None else ""),
                             # 'Cutoff': cutoff_type,
                             'Exp': exp + 1,
                             '#': len(y_test),
                         }
 
+                        np.random.seed(exp)
                         y_pred = cutoff.fit_apply(scores)
 
                         occ_metrics['Cutoff'] = cutoff.cutoff_type

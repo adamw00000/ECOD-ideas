@@ -7,7 +7,9 @@ DATASET_TYPE = 'BINARYdata'
 
 datasets = binary_datasets.full_dataset_list
 # datasets = [
-#     ('Arrhythmia', 'csv'),
+#     # ('Arrhythmia', 'csv'),
+#     # ('Tic-tac-toe', 'csv'),
+#     ('Banknote-authentication', 'csv'),
 # ]
 
 def get_all_dataset_configs(train_ratio=0.6):
