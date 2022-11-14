@@ -93,28 +93,29 @@ def run_fdr_tests(DATASET_TYPE, get_all_distribution_configs, alpha):
                             cutoff.visualize_lottery(scores, y_test, 
                                 test_case_name, clf_name, RESULTS_DIR,
                                 max_samples=100)
+                            cutoff.visualize_roc(scores, y_test,
+                                test_case_name, clf_name, RESULTS_DIR)
 
-                            p_vals = cutoff.get_p_vals(scores)
                             train_scores = clf.score_samples(X_train)
-                            train_p_vals = cutoff.get_p_vals(train_scores)
-
-                            visualize_scores(scores, p_vals, y_test,
-                                train_scores, train_p_vals,
-                                test_case_name, clf_name, cutoff.cutoff_type, RESULTS_DIR,
-                                plot_scores=(cutoff.cutoff_type == 'Multisplit')
-                            )
+                            cutoff.visualize_scores(scores, y_test, train_scores,
+                                test_case_name, clf_name, RESULTS_DIR)
                             
                             # Set up plots for later
 
                             sns.set_theme()
-                            bh_fig, bh_axs = plt.subplots(2, 2, figsize=(24, 16))
-                            for_fig, for_axs = plt.subplots(1, 2, figsize=(24, 8))
-                            fnr_fig, fnr_axs = plt.subplots(1, 2, figsize=(24, 8))
-                            for_fnr_fig, for_fnr_axs = plt.subplots(1, 2, figsize=(24, 8))
-
                             title = f'{test_case_name} - {clf_name}, {cutoff.cutoff_type}'
+                            
+                            bh_fig, bh_axs = plt.subplots(2, 2, figsize=(24, 16))
                             bh_fig.suptitle(title)
+                            
+                            for_fig, for_axs = plt.subplots(1, 2, figsize=(24, 8))
                             for_fig.suptitle(title)
+
+                            fnr_fig, fnr_axs = plt.subplots(1, 2, figsize=(24, 8))
+                            fnr_fig.suptitle(title)
+
+                            for_fnr_fig, for_fnr_axs = plt.subplots(1, 2, figsize=(24, 8))
+                            for_fnr_fig.suptitle(title)
 
                             plot_info = [ 
                                 # ((fig, axs), save_plot)

@@ -6,6 +6,7 @@ import os
 import matplotlib.pyplot as plt
 import seaborn as sns
 import pandas as pd
+from sklearn import metrics
 
 
 def select_indices(idx, *args):
@@ -184,7 +185,7 @@ class MultisplitCutoff(Cutoff):
         p_vals = self.__get_multisplit_p_values(scores)
         return self.apply_to_p_vals(p_vals)
     
-    def visualize_lottery(self, scores, y, 
+    def visualize_lottery(self, scores, y_test, 
             test_case_name, clf_name, results_dir, 
             max_samples=100):
         resampling_repeats = len(self.cal_scores_)
@@ -205,11 +206,13 @@ class MultisplitCutoff(Cutoff):
         mean_start = np.mean(p_vals_all.min(axis=0))
         mean_end = np.mean(p_vals_all.max(axis=0))
 
+        os.makedirs(os.path.join(results_dir, 'img', test_case_name), exist_ok=True)
+
         plt.figure(figsize=(16, 6))
         sns.set_theme()
 
         data = p_vals_all[:, :max_samples]
-        sample_types = np.where(y == 1, 'Inlier', 'Outlier')
+        sample_types = np.where(y_test == 1, 'Inlier', 'Outlier')
         hue_order = ['Inlier', 'Outlier']
 
         sns.scatterplot(
@@ -239,11 +242,97 @@ class MultisplitCutoff(Cutoff):
             bbox_inches='tight',
             facecolor='white',
         )
-        plt.show()
         plt.close()
 
+    def visualize_scores(self, scores, y_test, train_scores,
+            test_case_name, clf_name, results_dir):
+        p_vals = self.get_p_vals(scores)
+        train_p_vals = self.get_p_vals(train_scores)
+
+        inlier_idx = np.where(y_test == 1)[0]
+        inlier_mask = np.isin(range(len(y_test)), inlier_idx)
+
+        df = pd.DataFrame({
+            'Score': scores,
+            'p-value': p_vals,
+            'Class': np.where(inlier_mask, 'Inlier', 'Outlier'),
+        })
+        train_df = pd.DataFrame({
+            'Score': train_scores,
+            'p-value': train_p_vals,
+            'Class': np.array(['Inlier'] * len(train_scores))
+        })
+
+        os.makedirs(os.path.join(results_dir, 'img', test_case_name), exist_ok=True)
+
+        for metric in ['Score', 'p-value']:
+            sns.set_theme()
+            _, axs = plt.subplots(1, 2, figsize=(14, 6), 
+                sharex=True, sharey=True)
+
+            sns.histplot(train_df, x=metric, hue='Class', ax=axs[0],
+                hue_order=['Inlier'], stat='probability')
+            axs[0].set_title('Train')
+            sns.histplot(df, x=metric, hue='Class', ax=axs[1],
+                hue_order=['Inlier', 'Outlier'], stat='probability')
+            axs[1].set_title('Test')
+            
+            plt.suptitle(f'{test_case_name} ({clf_name}, {self.cutoff_type}) - {metric} distribution')
+            plt.savefig(
+                os.path.join(results_dir, 'img', test_case_name, f'distribution-{metric}-{clf_name}-{self.cutoff_type}.png'),
+                dpi=150,
+                bbox_inches='tight',
+                facecolor='white',
+            )
+            plt.close()
+
+    def visualize_roc(self, scores, y_test,
+            test_case_name, clf_name, results_dir):
+        p_vals = self.get_p_vals(scores)
+        
+        inlier_idx = np.where(y_test == 1)[0]
+        inlier_mask = np.isin(range(len(y_test)), inlier_idx)
+
+        df = pd.DataFrame({
+            'Score': scores,
+            'p-value': p_vals,
+            'Class': np.where(inlier_mask, 'Inlier', 'Outlier'),
+        })
+
+        os.makedirs(os.path.join(results_dir, 'img', test_case_name), exist_ok=True)
+
+        for metric in ['Score', 'p-value']:
+            # Plot ROC
+            fpr, tpr, _ = metrics.roc_curve(y_test, df[metric], pos_label=1)
+
+            sns.set_theme()
+            plt.figure(figsize=(8, 6))
+            plt.plot(
+                fpr,
+                tpr,
+                color="darkorange",
+                lw=2,
+                label="ROC curve (area = %0.2f)" % metrics.auc(fpr, tpr),
+            )
+            plt.plot([0, 1], [0, 1], color="navy", lw=2, linestyle="--")
+            plt.xlim([-0.01, 1.0])
+            plt.ylim([0.0, 1.01])
+            plt.xlabel("False Positive Rate")
+            plt.ylabel("True Positive Rate")
+            plt.title(f"{test_case_name} ({clf_name}) - {metric} ROC (for Inliers)")
+            plt.legend(loc="lower right")
+
+            plt.savefig(
+                os.path.join(results_dir, 'img', test_case_name, f'ROC-{metric}-{clf_name}-{self.cutoff_type}.png'),
+                dpi=150,
+                bbox_inches='tight',
+                facecolor='white',
+            )
+            plt.close()
 
 class PValueCutoff(Cutoff):
+    base_cutoff: Cutoff
+
     @property
     def full_cutoff_type(self):
         return self.base_cutoff.cutoff_type + '+' + self.cutoff_type
@@ -312,14 +401,21 @@ class PValueCutoff(Cutoff):
         
         num_elements = N
         if zoom:
+            num_elements = 100
             if zoom_left:
-                num_elements = min(100, int(1.5 * np.sum(y_test == 0)))
+                if np.sum(y_pred == 0) < len(y_pred):
+                    num_elements = max(num_elements, int(1.5 * np.sum(y_pred == 0)))
+                num_elements = min(N, num_elements)
+
                 x, p_vals, outlier_vec, rejected_vec, thresholds = \
                     tuple([a[:num_elements] \
                         for a in [x, p_vals, outlier_vec, rejected_vec, thresholds]
                     ])
             else:
-                num_elements = min(100, int(1.5 * np.sum(y_test == 1)))
+                if np.sum(y_pred == 0) < len(y_pred):
+                    num_elements = max(num_elements, int(1.5 * np.sum(y_pred == 1)))
+                num_elements = min(N, num_elements)
+
                 x, p_vals, outlier_vec, rejected_vec, thresholds = \
                     tuple([a[-num_elements:] \
                         for a in [x, p_vals, outlier_vec, rejected_vec, thresholds]
@@ -340,7 +436,7 @@ class PValueCutoff(Cutoff):
         
         ax.set_xlabel('p-value quantile')
         ax.set_ylabel('Value')
-        ax.set_ylim(0, None)
+        ax.set_ylim(-0.01, 1.01)
         
         legend = ax.legend()
         legend.legendHandles[-1]._sizes = [8.]
@@ -431,9 +527,9 @@ class CombinedFORFNRControlCutoff(PValueCutoff):
     
     def _get_thresholds(self, N):
         i_array = np.array(range(N))
-        return np.maximum(
+        return np.minimum( # use more tight one
             1 - ((1 - (i_array / N)) * (1 - self.alpha)) / (self.pi), # FOR
-            1 - ((1 - (i_array / N)) - self.alpha * (1 - self.pi)) / (self.pi), # FNR
+            1 - ((1 - (i_array / N) - self.alpha * (1 - self.pi))) / (self.pi), # FNR
         )
 
     def _calculate_threshold(self, sorted_p_vals, train_thresholds):
