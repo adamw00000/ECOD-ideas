@@ -309,6 +309,109 @@ def prepare_metrics(y_test, y_pred, scores, occ_metrics, metric_list, pos_class_
     return method_metrics
 
 # %%
+from occ_cutoffs import *
+
+def get_cutoff_predictions(cutoff, scores, visualize_tests=False, apply_control_cutoffs=False,
+        control_cutoff_params=None, common_visualization_params=None, special_visualization_params=None):
+    y_pred = cutoff.fit_apply(scores)
+    yield cutoff.cutoff_type, y_pred
+    
+    if not isinstance(cutoff, MultisplitCutoff):
+        return
+    
+    alpha, inlier_rate = \
+        control_cutoff_params['alpha'], control_cutoff_params['inlier_rate']
+    exp, pca_variance_threshold, clf, X_train, y_test = \
+        special_visualization_params['exp'], \
+        special_visualization_params['pca_variance_threshold'], \
+        special_visualization_params['clf'], \
+        special_visualization_params['X_train'], \
+        special_visualization_params['y_test']
+
+    # Multisplit only
+    visualize = (visualize_tests and exp == 0 and pca_variance_threshold is None)
+    if visualize:
+        visualize_multisplit(cutoff, scores, y_test, clf, X_train, common_visualization_params)
+        
+        # Set up plots for later
+        plot_infos = prepare_cutoff_plots(cutoff, **common_visualization_params)
+
+    if not apply_control_cutoffs:
+        return
+
+    for cutoff_num, control_cutoff in enumerate([
+        BenjaminiHochbergCutoff(cutoff, alpha, None),
+        BenjaminiHochbergCutoff(cutoff, alpha, inlier_rate),
+        FORControlCutoff(cutoff, alpha, inlier_rate),
+        FNRControlCutoff(cutoff, alpha, inlier_rate),
+        CombinedFORFNRControlCutoff(cutoff, alpha, inlier_rate),
+    ]):
+        y_pred = control_cutoff.fit_apply(scores)
+        yield control_cutoff.full_cutoff_type, y_pred
+
+        if visualize:
+            draw_cutoff_plots(control_cutoff, scores, y_test, common_visualization_params, plot_infos[cutoff_num])
+
+def visualize_multisplit(cutoff, scores, y_test, clf, X_train, common_visualization_params):
+    cutoff.visualize_calibration(
+            **common_visualization_params)
+    cutoff.visualize_lottery(scores, y_test, 
+            **common_visualization_params,
+            max_samples=100)
+    cutoff.visualize_roc(scores, y_test,
+            **common_visualization_params)
+
+    train_scores = clf.score_samples(X_train)
+    cutoff.visualize_scores(scores, y_test, train_scores,
+            **common_visualization_params)
+
+def prepare_cutoff_plots(cutoff, test_case_name, clf_name, RESULTS_DIR):
+    sns.set_theme()
+    title = f'{test_case_name} - {clf_name}, {cutoff.cutoff_type}'
+        
+    bh_fig, bh_axs = plt.subplots(2, 2, figsize=(24, 16))
+    bh_fig.suptitle(title)
+        
+    for_fig, for_axs = plt.subplots(1, 2, figsize=(24, 8))
+    for_fig.suptitle(title)
+
+    fnr_fig, fnr_axs = plt.subplots(1, 2, figsize=(24, 8))
+    fnr_fig.suptitle(title)
+
+    for_fnr_fig, for_fnr_axs = plt.subplots(1, 2, figsize=(24, 8))
+    for_fnr_fig.suptitle(title)
+
+    plot_info = [ 
+            # ((fig, axs), save_plot)
+            ((bh_fig, bh_axs[0, :]), False), 
+            ((bh_fig, bh_axs[1, :]), True),
+            ((for_fig, for_axs), True),
+            ((fnr_fig, fnr_axs), True),
+            ((for_fnr_fig, for_fnr_axs), True),
+        ]
+    
+    return plot_info
+
+def draw_cutoff_plots(control_cutoff, scores, y_test, common_visualization_params, plot_info):
+    ((fig, axs), save_plot) = plot_info
+    zoom_left = isinstance(control_cutoff, BenjaminiHochbergCutoff)
+
+    figure = (fig, axs[0])
+    zoom = False
+    control_cutoff.visualize(scores, y_test, figure, \
+        **common_visualization_params, \
+        zoom=zoom, zoom_left=zoom_left, save_plot=False
+    )
+
+    figure = (fig, axs[1])
+    zoom = True
+    save_plot = save_plot
+    control_cutoff.visualize(scores, y_test, figure, \
+        **common_visualization_params, \
+        zoom=zoom, zoom_left=zoom_left, save_plot=save_plot
+    )
+
+# %%
 import pandas as pd
 
 def append_mean_row(df):

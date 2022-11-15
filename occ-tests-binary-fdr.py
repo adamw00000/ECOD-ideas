@@ -12,6 +12,7 @@ datasets = binary_datasets.full_dataset_list
 #     # ('Dermatology', 'csv'),
 #     # ('Madelon', 'csv'),
 #     # ('Banknote-authentication', 'csv'),
+#     # ('Isolet', 'csv'),
 # ]
 
 def get_all_dataset_configs(train_ratio=0.6):
