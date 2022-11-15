@@ -90,6 +90,8 @@ def run_fdr_tests(DATASET_TYPE, get_all_distribution_configs, alpha):
                         # Multisplit only
                         visualize = exp == 0 and pca_variance_threshold is None
                         if visualize:
+                            cutoff.visualize_calibration(
+                                test_case_name, clf_name, RESULTS_DIR)
                             cutoff.visualize_lottery(scores, y_test, 
                                 test_case_name, clf_name, RESULTS_DIR,
                                 max_samples=100)

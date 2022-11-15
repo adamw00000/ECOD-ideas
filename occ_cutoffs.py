@@ -330,6 +330,106 @@ class MultisplitCutoff(Cutoff):
             )
             plt.close()
 
+    def visualize_calibration(self, test_case_name, clf_name, results_dir):
+        N = len(self.X_train)
+        cal_scores_all = np.zeros((self.resampling_repeats, N - int(N/2)))
+
+        cal_df = pd.DataFrame()
+        train_df = pd.DataFrame()
+
+        mu_multis = []
+        sigma_inv_multis = []
+        for i in range(self.resampling_repeats):
+            multisplit_samples = np.random.choice(range(N), size=int(N/2), replace=False)
+            is_multisplit_sample = np.isin(range(N), multisplit_samples)
+            X_multi_train, X_multi_cal = self.X_train[is_multisplit_sample], self.X_train[~is_multisplit_sample]
+            
+            self.clf.fit(X_multi_train)
+            cal_scores = self.clf.score_samples(X_multi_cal)
+            cal_scores_all[i, :] = cal_scores
+        
+            cal_df = pd.concat([cal_df, pd.DataFrame({
+                'Sample': np.char.add('C', (np.array(range(len(X_multi_cal))) + 1).astype(str)),
+                'Split': np.char.add('Cal', np.repeat(i + 1, len(X_multi_cal)).astype(str)),
+                'Score': cal_scores,
+            })])
+            train_df = pd.concat([train_df, pd.DataFrame({
+                'Sample': np.char.add('C', (np.array(range(len(self.X_train))) + 1).astype(str)),
+                'Split': np.char.add('Cal', np.repeat(i + 1, len(self.X_train)).astype(str)),
+                'Score': self.clf.score_samples(self.X_train),
+            })])
+            mu_multis.append(np.mean(X_multi_train, axis=0).reshape(1, -1))
+            sigma_inv_multis.append(np.linalg.pinv(np.cov(X_multi_train.T)))
+
+        mu_full = np.mean(self.X_train, axis=0).reshape(1, -1)
+        sigma_inv_full = np.linalg.pinv(np.cov(self.X_train.T))
+
+        self.clf.fit(self.X_train)
+        train_scores = self.clf.score_samples(self.X_train)
+
+        if clf_name == 'Mahalanobis':
+            conf_matrix = np.eye(self.resampling_repeats + 1)
+            for i, sim1 in enumerate(sigma_inv_multis + [sigma_inv_full]):
+                for j, sim2 in enumerate(sigma_inv_multis + [sigma_inv_full]):
+                    conf_matrix[i, j] = np.linalg.norm(sim1 - sim2)
+
+            # conf_matrix /= conf_matrix.sum(axis=0)
+
+            sns.reset_defaults()
+
+            fig = plt.figure(figsize=(12, 12))
+            ax = fig.gca()
+            disp = metrics.ConfusionMatrixDisplay(
+                confusion_matrix=conf_matrix,
+                display_labels=list(np.unique(cal_df.Split)) + ['Train'],
+            )
+            disp.plot(ax=ax)
+            plt.title(f'{test_case_name} ({clf_name}) - pairwise distances between estimated covariance matrices')
+            plt.savefig(
+                os.path.join(results_dir, 'img', test_case_name, f'diagnostic-covariance-{clf_name}-{self.cutoff_type}.png'),
+                dpi=300,
+                bbox_inches='tight',
+                facecolor='white',
+            )
+            plt.close()
+
+        cal_df = pd.concat([cal_df, pd.DataFrame({
+            'Sample': (np.array(range(len(self.X_train))) + 1).astype(str),
+            'Split': 'Train',
+            'Score': train_scores,
+        })])
+        train_df = pd.concat([train_df, pd.DataFrame({
+            'Sample': (np.array(range(len(self.X_train))) + 1).astype(str),
+            'Split': 'Train',
+            'Score': train_scores,
+        })])
+        cal_df = cal_df.reset_index(drop=True)
+        train_df = train_df.reset_index(drop=True)
+
+        sns.set_theme()
+
+        fig, axs = plt.subplots(1, 2, figsize=(16, 6), sharex=True)
+        fig.suptitle(f'{test_case_name} ({clf_name}) - scores per calibration split')
+
+        ax = axs[0]
+        sns.stripplot(data=cal_df, x='Score', y='Split', orient='h', ax=ax)
+        ax.set_title(f'Calibration set only')
+
+        ax = axs[1]
+        sns.stripplot(data=cal_df, x='Score', y='Split', orient='h', ax=ax)
+        ax.set_title(f'{test_case_name} ({clf_name}) - scores per calibration split, whole train dataset')
+        ax.set_title(f'Whole train')
+
+        plt.savefig(
+            os.path.join(results_dir, 'img', test_case_name, f'diagnostic-scores-{clf_name}-{self.cutoff_type}.png'),
+            dpi=300,
+            bbox_inches='tight',
+            facecolor='white',
+        )
+        plt.close()
+
+        return cal_scores_all
+
 class PValueCutoff(Cutoff):
     base_cutoff: Cutoff
 
