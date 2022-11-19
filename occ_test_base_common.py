@@ -105,8 +105,8 @@ def run_tests(metric_list, alpha_metric, test_description, get_results_dir, base
     pivots = {}
     for metric in metric_list:
         metric_df = df
-        if metric == 'AUC':
-            metric_df = df.loc[df.Cutoff == 'Empirical']
+        # if metric == 'AUC':
+        #     metric_df = df.loc[np.isin(df.Cutoff, ['Empirical'])]
         
         pivot = metric_df \
             .pivot_table(values=metric, index=['Dataset'], columns=['Method', 'Cutoff'], dropna=False)
