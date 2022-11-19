@@ -11,7 +11,7 @@ from typing import List
 n_repeats = 10
 resampling_repeats = 10
 
-def run_tests(metric_list, alpha_metric, test_description, get_results_dir, baselines, get_cutoffs, pca_thresholds,
+def run_tests(metric_list, alpha_metrics, test_description, get_results_dir, baselines, get_cutoffs, pca_thresholds,
         DATASET_TYPE, get_all_distribution_configs, alpha, test_inliers_only=False, visualize_tests=True, apply_control_cutoffs=True):
     full_results = []
 
@@ -88,7 +88,7 @@ def run_tests(metric_list, alpha_metric, test_description, get_results_dir, base
         res_df = dataset_df.groupby(['Dataset', 'Method', 'Cutoff'])\
             [metric_list] \
             .mean()
-        if alpha_metric is not None:
+        for alpha_metric in alpha_metrics:
             res_df[f'{alpha_metric} < alpha'] = res_df[alpha_metric] < alpha
 
         for metric in metric_list:
@@ -119,5 +119,5 @@ def run_tests(metric_list, alpha_metric, test_description, get_results_dir, base
         pivot \
             .to_csv(os.path.join(RESULTS_DIR, f'{DATASET_TYPE}-all-{metric}.csv'))
 
-    if alpha_metric is not None:
+    for alpha_metric in alpha_metrics:
         append_mean_row(pivots[alpha_metric] < alpha).to_csv(os.path.join(RESULTS_DIR, f'{DATASET_TYPE}-all-{alpha_metric}-alpha.csv'))

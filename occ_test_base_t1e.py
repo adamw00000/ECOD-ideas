@@ -4,7 +4,7 @@ from occ_test_base_common import run_tests
 from typing import List
 
 metric_list = ['T1E']
-alpha_metric = 'T1E'
+alpha_metrics = ['T1E']
 
 test_description = 'Type I Error tests'
 get_results_dir = lambda dataset_type, alpha: f'results_{dataset_type}_t1e_{alpha:.2f}'
@@ -32,5 +32,5 @@ def get_cutoffs(construct_clf, alpha, resampling_repeats) -> List[Cutoff]:
 pca_thresholds = [None, 1.0]
 
 def run_type_I_error_tests(DATASET_TYPE, get_all_distribution_configs, alpha):
-    run_tests(metric_list, alpha_metric, test_description, get_results_dir, baselines, get_cutoffs, pca_thresholds,
+    run_tests(metric_list, alpha_metrics, test_description, get_results_dir, baselines, get_cutoffs, pca_thresholds,
         DATASET_TYPE, get_all_distribution_configs, alpha, test_inliers_only=True, visualize_tests=False, apply_control_cutoffs=False)
