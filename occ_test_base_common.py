@@ -62,7 +62,7 @@ def run_tests(metric_list, alpha_metric, test_description, get_results_dir, base
                     }
 
                     for cutoff in get_cutoffs(construct_clf, alpha, resampling_repeats):
-                        if not apply_multisplit_to_baseline(clf_name) and (isinstance(cutoff, MultisplitCutoff) or isinstance(cutoff, MultisplitThresholdCutoff)):
+                        if not apply_multisplit_to_baseline(clf_name) and (isinstance(cutoff, MultisplitCutoff) or isinstance(cutoff, MultisplitThresholdCutoff) or isinstance(cutoff, NoSplitCutoff)):
                             continue
 
                         np.random.seed(exp)

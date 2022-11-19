@@ -27,6 +27,7 @@ def get_cutoffs(construct_clf, alpha, resampling_repeats) -> List[Cutoff]:
         # MultisplitCutoff(construct_clf, alpha, resampling_repeats=resampling_repeats, median_multiplier=2),
         # MultisplitCutoff(construct_clf, alpha, resampling_repeats=1, median_multiplier=2),
         MultisplitCutoff(construct_clf, alpha, resampling_repeats=resampling_repeats, median_multiplier=1),
+        NoSplitCutoff(construct_clf, alpha),
     ]
 pca_thresholds = [None, 1.0]
 

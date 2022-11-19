@@ -145,6 +145,43 @@ class MultisplitThresholdCutoff(__ResamplingThresholdCutoffBase):
         return np.random.choice(range(N), size=int(N/2), replace=False)
 
 
+class NoSplitCutoff(Cutoff):
+    cutoff_type = 'NoSplit'
+    
+    def __init__(self, construct_clf, alpha):
+        self.clf = construct_clf()
+        self.alpha = alpha
+
+    def __prepare_nosplit_cal_scores(self, X_train):
+        self._clf_train(self.clf, X_train)
+        cal_scores = self._clf_predict(self.clf, X_train)
+        return cal_scores
+
+    def __get_nosplit_p_values(self, X_test):
+        cal_scores = self.cal_scores_
+        test_scores = self._clf_predict(self.clf, X_test)
+
+        num_smaller_cal_scores = (test_scores > cal_scores.reshape(-1, 1)).sum(axis=0)
+        p_vals = (num_smaller_cal_scores + 1) / (len(cal_scores) + 1)
+        return p_vals
+
+    def fit(self, X_train):
+        self.cal_scores_ = self.__prepare_nosplit_cal_scores(X_train)
+        self.is_fitted = True
+        return self.cal_scores_
+
+    def get_p_vals(self, X_test):
+        return self.__get_nosplit_p_values(X_test)
+
+    def apply_to_p_vals(self, p_vals):
+        y_pred = np.where(p_vals < self.alpha, 0, 1)
+        return y_pred
+
+    def apply(self, X_test, inlier_rate):
+        p_vals = self.__get_nosplit_p_values(X_test)
+        return p_vals, self.apply_to_p_vals(p_vals)
+
+
 class MultisplitCutoff(Cutoff):
     @property
     def cutoff_type(self):
