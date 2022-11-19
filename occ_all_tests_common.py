@@ -249,13 +249,16 @@ def apply_multisplit_to_baseline(baseline):
 # %%
 from sklearn import metrics
 
-def get_metrics(y_true, y_pred, scores, pos_class_only=False):
+def get_metrics(y_true, y_pred, scores, pos_class_only=False, \
+        default_pre=0, default_rec=0, default_f1=0, \
+        default_fdr=0, default_fnr=0, default_for=0):
     false_detections = np.sum((y_pred == 0) & (y_true == 1))
     detections = np.sum(y_pred == 0)
-    if detections == 0:
-        fdr = np.nan
-    else:
+    if detections != 0:
         fdr = false_detections / detections
+    else:
+        # fdr = np.nan
+        fdr = default_fdr
 
     if not pos_class_only:
         auc = metrics.roc_auc_score(y_true, scores)
@@ -263,9 +266,9 @@ def get_metrics(y_true, y_pred, scores, pos_class_only=False):
         auc = np.nan
     
     acc = metrics.accuracy_score(y_true, y_pred)
-    pre = metrics.precision_score(y_true, y_pred, zero_division=0)
-    rec = metrics.recall_score(y_true, y_pred, zero_division=0)
-    f1 = metrics.f1_score(y_true, y_pred, zero_division=0)
+    pre = metrics.precision_score(y_true, y_pred, zero_division=default_pre)
+    rec = metrics.recall_score(y_true, y_pred, zero_division=default_rec)
+    f1 = metrics.f1_score(y_true, y_pred, zero_division=default_f1)
 
     inlier_idx = np.where(y_true == 1)[0]
     t1e = 1 - np.mean(y_pred[inlier_idx] == y_true[inlier_idx])
@@ -273,15 +276,17 @@ def get_metrics(y_true, y_pred, scores, pos_class_only=False):
     # important for PU
     false_rejections = np.sum((y_pred == 1) & (y_true == 0)) # False rejections == negative samples predicted to be positive
     rejections = np.sum(y_pred == 1) # All rejections == samples predicted to be positive
-    if rejections == 0:
-        false_omission_rate = np.nan
-    else:
+    if rejections != 0:
         false_omission_rate = false_rejections / rejections
+    else:
+        # false_omission_rate = np.nan
+        false_omission_rate = default_for
 
-    if np.sum(y_true == 0):
+    if np.sum(y_true == 0) != 0:
         fnr = false_rejections / np.sum(y_true == 0)
     else:
-        fnr = np.nan
+        # fnr = np.nan
+        fnr = default_fnr
 
     return {
         'AUC': auc,
