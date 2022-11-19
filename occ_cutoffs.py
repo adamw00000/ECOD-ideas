@@ -235,27 +235,43 @@ class MultisplitCutoff(Cutoff):
         sns.set_theme()
 
         data = p_vals_all[:, :max_samples]
-        sample_types = np.where(y_test == 1, 'Inlier', 'Outlier')
+        df = pd.DataFrame({
+            'p-value': data.reshape(-1),
+            'Split': np.repeat(range(1, 11), data.shape[1]),
+            'Sample': np.tile(range(1, data.shape[1] + 1), data.shape[0]),
+            'Type': np.tile(np.where(y_test[:data.shape[1]] == 1, 'Inlier', 'Outlier'), data.shape[0]),
+        })
+
+        median_df = df.groupby(['Sample', 'Type']) \
+            ['p-value'] \
+            .median() \
+            .rename('Median p-value') \
+            .reset_index(drop=False) \
+            .sort_values(['Type', 'Median p-value'], ascending=[False, True]) \
+            .assign(Order=range(data.shape[1]))
+
+        # sample_types = np.where(y_test == 1, 'Inlier', 'Outlier')
         hue_order = ['Inlier', 'Outlier']
 
         sns.scatterplot(
-            x=np.array(range(len(p_vals)))[:max_samples],
-            y=p_vals[:max_samples],
-            hue=sample_types[:max_samples],
+            data=median_df,
+            x='Order',
+            y='Median p-value',
+            hue='Type',
             hue_order=hue_order,
             palette=[sns.color_palette()[0], sns.color_palette()[3]],
             zorder=100, s=12, edgecolor='k',
         )
         plt.legend(title='Median values')
 
-        df = pd.DataFrame({
-            'p-value': p_vals_all[:, :max_samples].reshape(-1),
-            'Split': np.repeat(range(1, 11), data.shape[1]),
-            'Sample': np.tile(range(1, data.shape[1] + 1), data.shape[0]),
-        })        
-        sns.stripplot(data=df, x='Sample', y='p-value', linewidth=0.2)
+        df = df.merge(median_df, on=['Sample', 'Type']) \
+            .sort_values('Order')
+        sns.stripplot(data=df, x='Order', y='p-value', linewidth=0.2)
 
         plt.tick_params(axis='x', labelsize=6)
+        plt.xticks(df.Order, df.Sample)
+        plt.xlabel('Sample number')
+
         plt.title(f'{self.cutoff_type} ({clf_name}) p-value lottery' + \
             f' - max range length: {max_range:.3f}, mean: {mean_range:.3f}, median: {median_range:.3f}, range: ({mean_start:.3f}-{mean_end:.3f})')
 
