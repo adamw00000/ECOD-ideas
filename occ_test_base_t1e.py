@@ -18,15 +18,15 @@ baselines = [
     # 'OC-SVM',
     # 'IForest',
 ]
-def get_cutoffs(inlier_rate, dim, resampling_repeats, X_train, clf, alpha) -> List[Cutoff]:
+def get_cutoffs(construct_clf, alpha, resampling_repeats) -> List[Cutoff]:
     return [
-        EmpiricalCutoff(inlier_rate),
-        # ChiSquaredCutoff(inlier_rate, dim),
-        # BootstrapThresholdCutoff(inlier_rate, resampling_repeats, X_train, clf),
-        MultisplitThresholdCutoff(inlier_rate, resampling_repeats, X_train, clf),
-        # MultisplitCutoff(inlier_rate, resampling_repeats, X_train, clf, alpha, median_multiplier=2),
-        # MultisplitCutoff(inlier_rate, 1, X_train, clf, alpha, median_multiplier=2),
-        MultisplitCutoff(inlier_rate, resampling_repeats, X_train, clf, alpha, median_multiplier=1),
+        EmpiricalCutoff(construct_clf),
+        # ChiSquaredCutoff(construct_clf, dim),
+        # BootstrapThresholdCutoff(construct_clf, resampling_repeats),
+        MultisplitThresholdCutoff(construct_clf, resampling_repeats),
+        # MultisplitCutoff(construct_clf, alpha, resampling_repeats=resampling_repeats, median_multiplier=2),
+        # MultisplitCutoff(construct_clf, alpha, resampling_repeats=1, median_multiplier=2),
+        MultisplitCutoff(construct_clf, alpha, resampling_repeats=resampling_repeats, median_multiplier=1),
     ]
 pca_thresholds = [None, 1.0]
 

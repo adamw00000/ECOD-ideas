@@ -20,96 +20,117 @@ class Cutoff():
     def cutoff_type(self):
         raise NotImplementedError('Use derived class for cutoff')
 
-    def fit(self, scores) -> float:
+    def _clf_train(self, clf, train_data):
+        return clf.fit(train_data)
+
+    def _clf_predict(self, clf, test_data):
+        scores = clf.score_samples(test_data)
+        return scores
+
+    def fit(self, X_train):
         raise NotImplementedError('Use derived class for cutoff')
     
-    def apply(self, scores):
+    def apply(self, X_test, inlier_rate):
         raise NotImplementedError('Use derived class for cutoff')
 
-    def fit_apply(self, scores):
-        self.fit(scores)
-        return self.apply(scores)
+    def fit_apply(self, X_train, X_test, inlier_rate):
+        self.fit(X_train)
+        return self.apply(X_test, inlier_rate)
 
 
 class EmpiricalCutoff(Cutoff):
     cutoff_type = 'Empirical'
 
-    def __init__(self, inlier_rate):
-        self.inlier_rate = inlier_rate
+    def __init__(self, construct_clf):
+        self.clf = construct_clf()
 
-    def fit(self, scores):
-        self.threshold_ = np.quantile(scores, q=1 - self.inlier_rate)
+    def fit(self, X_train):
+        self._clf_train(self.clf, X_train)
         self.is_fitted = True
-        return self.threshold_
-    
-    def apply(self, scores):
+
+    def apply(self, X_test, inlier_rate):
+        scores = self._clf_predict(self.clf, X_test)
+        self.threshold_ = np.quantile(scores, q=1 - inlier_rate)
         y_pred = np.where(scores > self.threshold_, 1, 0)
-        return y_pred
+        return scores, y_pred
 
 
 class ChiSquaredCutoff(Cutoff):
     cutoff_type = 'Chi-squared'
 
-    def __init__(self, inlier_rate, d):
-        self.inlier_rate = inlier_rate
-        # d - number of features
-        self.d = d
+    def __init__(self, construct_clf, dim):
+        self.clf = construct_clf()
+        # dim - number of features
+        self.d = dim
 
-    def fit(self, scores):
+    def fit(self, X_train):
+        self._clf_train(self.clf, X_train)
         self.threshold_ = -scipy.stats.chi2.ppf(1 - self.inlier_rate, 2 * self.d)
         self.is_fitted = True
-        return self.threshold_
-    
-    def apply(self, scores):
+
+    def apply(self, X_test, inlier_rate):
+        scores = self._clf_predict(self.clf, X_test)
         y_pred = np.where(scores > self.threshold_, 1, 0)
-        return y_pred
+        return scores, y_pred
 
 
 class __ResamplingThresholdCutoffBase(Cutoff):
-    def __init__(self, inlier_rate, resampling_repeats, X_train, clf):
-        self.inlier_rate = inlier_rate
-        # d - number of features
+    def __init__(self, construct_clf, resampling_repeats):
+        self.clfs = []
+        for _ in range(resampling_repeats):
+            self.clfs.append(construct_clf())
+
         self.resampling_repeats = resampling_repeats
-        self.X_train = X_train
-        self.clf = clf
 
     def _choose_samples(self, N):
         raise NotImplementedError('Use derived class for cutoff')
 
-    def __prepare_threshold(self):
-        N = len(self.X_train)
-        thresholds = []
+    def __prepare_resampling_cal_scores(self, X_train):
+        N = len(X_train)
+        cal_scores_all = []
 
-        for _ in range(self.resampling_repeats):
+        for i in range(self.resampling_repeats):
             resampling_samples = self._choose_samples(N)
-
             is_selected_sample = np.isin(range(N), resampling_samples)
-            X_resampling_train, X_resampling_cal = self.X_train[is_selected_sample], self.X_train[~is_selected_sample]
-
-            self.clf.fit(X_resampling_train)
-            scores = self.clf.score_samples(X_resampling_cal)
-
-            emp_quantile = np.quantile(scores, q=1 - self.inlier_rate)
-            thresholds.append(emp_quantile)
+            X_resampling_train, X_resampling_cal = X_train[is_selected_sample], X_train[~is_selected_sample]
+            
+            self._clf_train(self.clfs[i], X_resampling_train)
+            cal_scores = self._clf_predict(self.clfs[i], X_resampling_cal)
+            cal_scores_all.append(cal_scores)
         
+        return cal_scores_all
+
+    def __get_resampling_predictions(self, X_test, inlier_rate):
+        thresholds = np.zeros(self.resampling_repeats)
+        test_scores_all = np.zeros((self.resampling_repeats, len(X_test)))
+
+        for i in range(self.resampling_repeats):
+            test_scores = self._clf_predict(self.clfs[i], X_test)
+            cal_scores = self.cal_scores_[i]
+
+            emp_quantile = np.quantile(cal_scores, q=1 - inlier_rate)
+            test_scores_all[i, :] = test_scores
+            thresholds[i] = emp_quantile
+
+        test_scores = np.median(test_scores_all, axis=0)
         resampling_threshold = np.mean(thresholds)
-        return resampling_threshold
+        return test_scores, resampling_threshold
 
-    def fit(self, scores):
-        self.threshold_ = self.__prepare_threshold()
+    def fit(self, X_train):
+        self.cal_scores_ = self.__prepare_resampling_cal_scores(X_train)
         self.is_fitted = True
-        return self.threshold_
 
-    def apply(self, scores):
-        y_pred = np.where(scores > self.threshold_, 1, 0)
-        return y_pred
+    def apply(self, X_test, inlier_rate):
+        test_scores, threshold_ = self.__get_resampling_predictions(X_test, inlier_rate)
+        y_pred = np.where(test_scores > threshold_, 1, 0)
+        return test_scores, y_pred
 
 
 class BootstrapThresholdCutoff(__ResamplingThresholdCutoffBase):
     cutoff_type = 'Bootstrap_threshold'
 
-    def __init__(self, inlier_rate, resampling_repeats, X_train, clf):
-        super().__init__(inlier_rate, resampling_repeats, X_train, clf)
+    def __init__(self, construct_clf, resampling_repeats):
+        super().__init__(construct_clf, resampling_repeats)
 
     def _choose_samples(self, N):
         return np.random.choice(range(N), size=N, replace=True)
@@ -117,8 +138,8 @@ class BootstrapThresholdCutoff(__ResamplingThresholdCutoffBase):
 class MultisplitThresholdCutoff(__ResamplingThresholdCutoffBase):
     cutoff_type = 'Multisplit_threshold'
 
-    def __init__(self, inlier_rate, resampling_repeats, X_train, clf):
-        super().__init__(inlier_rate, resampling_repeats, X_train, clf)
+    def __init__(self, construct_clf, resampling_repeats):
+        super().__init__(construct_clf, resampling_repeats)
 
     def _choose_samples(self, N):
         return np.random.choice(range(N), size=int(N/2), replace=False)
@@ -131,72 +152,74 @@ class MultisplitCutoff(Cutoff):
             + (f'-{self.median_multiplier}_median' if self.median_multiplier != 1 else '') \
             + (f'-{self.resampling_repeats}_repeat' if self.resampling_repeats != 10 else '')
 
-    def __init__(self, inlier_rate, resampling_repeats, X_train, clf, alpha, median_multiplier=2):
-        self.inlier_rate = inlier_rate
-        # d - number of features
-        self.resampling_repeats = resampling_repeats
-        self.X_train = X_train
-        self.clf = clf
+    def __init__(self, construct_clf, alpha, resampling_repeats, median_multiplier=2):
+        self.construct_clf = construct_clf
+        self.clfs = []
+        for _ in range(resampling_repeats):
+            self.clfs.append(construct_clf())
 
         self.alpha = alpha
+        self.resampling_repeats = resampling_repeats
         self.median_multiplier = median_multiplier
-    
-    def __prepare_multisplit_cal_scores(self):
-        N = len(self.X_train)
+
+    def __prepare_multisplit_cal_scores(self, X_train):
+        N = len(X_train)
         cal_scores_all = np.zeros((self.resampling_repeats, N - int(N/2)))
 
         for i in range(self.resampling_repeats):
             multisplit_samples = np.random.choice(range(N), size=int(N/2), replace=False)
             is_multisplit_sample = np.isin(range(N), multisplit_samples)
-            X_multi_train, X_multi_cal = self.X_train[is_multisplit_sample], self.X_train[~is_multisplit_sample]
+            X_multi_train, X_multi_cal = X_train[is_multisplit_sample], X_train[~is_multisplit_sample]
             
-            self.clf.fit(X_multi_train)
-            cal_scores = self.clf.score_samples(X_multi_cal)
+            self._clf_train(self.clfs[i], X_multi_train)
+            cal_scores = self._clf_predict(self.clfs[i], X_multi_cal)
             cal_scores_all[i, :] = cal_scores
         
         return cal_scores_all
 
-    def __get_multisplit_p_values(self, scores):
-        resampling_repeats = len(self.cal_scores_)
-
-        p_vals_all = np.zeros((resampling_repeats, len(scores)))
-        for i in range(resampling_repeats):
+    def __get_multisplit_p_values(self, X_test):
+        p_vals_all = np.zeros((self.resampling_repeats, len(X_test)))
+        for i in range(self.resampling_repeats):
             cal_scores = self.cal_scores_[i, :]
-            num_smaller_cal_scores = (scores > cal_scores.reshape(-1, 1)).sum(axis=0)
+            test_scores = self._clf_predict(self.clfs[i], X_test)
+
+            num_smaller_cal_scores = (test_scores > cal_scores.reshape(-1, 1)).sum(axis=0)
             p_vals = (num_smaller_cal_scores + 1) / (len(cal_scores) + 1)
             p_vals_all[i, :] = p_vals
 
         p_vals = self.median_multiplier * np.median(p_vals_all, axis=0)
         return p_vals
-    
-    def fit(self, scores):
-        self.cal_scores_ = self.__prepare_multisplit_cal_scores()
+
+    def fit(self, X_train):
+        self.cal_scores_ = self.__prepare_multisplit_cal_scores(X_train)
         self.is_fitted = True
         return self.cal_scores_
 
-    def get_p_vals(self, scores):
-        return self.__get_multisplit_p_values(scores)
-    
+    def get_p_vals(self, X_test):
+        return self.__get_multisplit_p_values(X_test)
+
     def apply_to_p_vals(self, p_vals):
         y_pred = np.where(p_vals < self.alpha, 0, 1)
         return y_pred
-    
-    def apply(self, scores):
-        p_vals = self.__get_multisplit_p_values(scores)
-        return self.apply_to_p_vals(p_vals)
-    
-    def visualize_lottery(self, scores, y_test, 
+
+    def apply(self, X_test, inlier_rate):
+        p_vals = self.__get_multisplit_p_values(X_test)
+        return p_vals, self.apply_to_p_vals(p_vals)
+
+    def visualize_lottery(self, visualization_data, 
             test_case_name, clf_name, RESULTS_DIR, 
             max_samples=100):
-        resampling_repeats = len(self.cal_scores_)
+        X_train, X_test, y_test = visualization_data
 
-        p_vals_all = np.zeros((resampling_repeats, len(scores)))
-        for i in range(resampling_repeats):
+        p_vals_all = np.zeros((self.resampling_repeats, len(X_test)))
+        for i in range(self.resampling_repeats):
             cal_scores = self.cal_scores_[i, :]
-            num_smaller_cal_scores = (scores > cal_scores.reshape(-1, 1)).sum(axis=0)
+            test_scores = self._clf_predict(self.clfs[i], X_test)
+
+            num_smaller_cal_scores = (test_scores > cal_scores.reshape(-1, 1)).sum(axis=0)
             p_vals = (num_smaller_cal_scores + 1) / (len(cal_scores) + 1)
             p_vals_all[i, :] = p_vals
-
+        
         p_vals = self.median_multiplier * np.median(p_vals_all, axis=0)
 
         p_val_range = p_vals_all.max(axis=0) - p_vals_all.min(axis=0)
@@ -244,28 +267,31 @@ class MultisplitCutoff(Cutoff):
         )
         plt.close()
 
-    def visualize_scores(self, scores, y_test, train_scores,
+    def visualize_p_values(self, visualization_data,
             test_case_name, clf_name, RESULTS_DIR):
-        p_vals = self.get_p_vals(scores)
-        train_p_vals = self.get_p_vals(train_scores)
+        X_train, X_test, y_test = visualization_data
+
+        p_vals = self.get_p_vals(X_test)
+        train_p_vals = self.get_p_vals(X_train)
 
         inlier_idx = np.where(y_test == 1)[0]
         inlier_mask = np.isin(range(len(y_test)), inlier_idx)
 
         df = pd.DataFrame({
-            'Score': scores,
+            # 'Score': scores,
             'p-value': p_vals,
             'Class': np.where(inlier_mask, 'Inlier', 'Outlier'),
         })
         train_df = pd.DataFrame({
-            'Score': train_scores,
+            # 'Score': train_scores,
             'p-value': train_p_vals,
-            'Class': np.array(['Inlier'] * len(train_scores))
+            'Class': np.array(['Inlier'] * len(train_p_vals))
         })
 
         os.makedirs(os.path.join(RESULTS_DIR, 'img', test_case_name), exist_ok=True)
 
-        for metric in ['Score', 'p-value']:
+        # for metric in ['Score', 'p-value']:
+        for metric in ['p-value']:
             sns.set_theme()
             _, axs = plt.subplots(1, 2, figsize=(14, 6), 
                 sharex=True, sharey=True)
@@ -286,22 +312,24 @@ class MultisplitCutoff(Cutoff):
             )
             plt.close()
 
-    def visualize_roc(self, scores, y_test,
+    def visualize_roc(self, visualization_data,
             test_case_name, clf_name, RESULTS_DIR):
-        p_vals = self.get_p_vals(scores)
+        X_train, X_test, y_test = visualization_data
+        p_vals = self.get_p_vals(X_test)
         
         inlier_idx = np.where(y_test == 1)[0]
         inlier_mask = np.isin(range(len(y_test)), inlier_idx)
 
         df = pd.DataFrame({
-            'Score': scores,
+            # 'Score': scores,
             'p-value': p_vals,
             'Class': np.where(inlier_mask, 'Inlier', 'Outlier'),
         })
 
         os.makedirs(os.path.join(RESULTS_DIR, 'img', test_case_name), exist_ok=True)
 
-        for metric in ['Score', 'p-value']:
+        # for metric in ['Score', 'p-value']:
+        for metric in ['p-value']:
             # Plot ROC
             fpr, tpr, _ = metrics.roc_curve(y_test, df[metric], pos_label=1)
 
@@ -330,46 +358,60 @@ class MultisplitCutoff(Cutoff):
             )
             plt.close()
 
-    def visualize_calibration(self, test_case_name, clf_name, RESULTS_DIR):
-        N = len(self.X_train)
-        cal_scores_all = np.zeros((self.resampling_repeats, N - int(N/2)))
+    def visualize_calibration(self, visualization_data, test_case_name, clf_name, RESULTS_DIR):
+        vis_clfs = []
+        for _ in range(self.resampling_repeats):
+            vis_clfs.append(self.construct_clf())
 
-        train_df = pd.DataFrame()
+        X_train, X_test, y_test = visualization_data
+        N = len(X_train)
 
         mu_multis = []
         sigma_multis = []
+        train_df = pd.DataFrame()
+
         for i in range(self.resampling_repeats):
             multisplit_samples = np.random.choice(range(N), size=int(N/2), replace=False)
             is_multisplit_sample = np.isin(range(N), multisplit_samples)
-            X_multi_train, X_multi_cal = self.X_train[is_multisplit_sample], self.X_train[~is_multisplit_sample]
+            X_multi_train, X_multi_cal = X_train[is_multisplit_sample], X_train[~is_multisplit_sample]
             
-            self.clf.fit(X_multi_train)
-            cal_scores = self.clf.score_samples(X_multi_cal)
-            cal_scores_all[i, :] = cal_scores
+            self._clf_train(vis_clfs[i], X_multi_train)
+            train_scores = self._clf_predict(vis_clfs[i], X_train)
+            # test_scores = self._clf_predict(vis_clfs[i], X_test)
 
             train_df = pd.concat([train_df, pd.DataFrame({
-                'Sample': np.char.add('C', (np.array(range(len(self.X_train))) + 1).astype(str)),
-                'Split': np.char.add('Cal', np.repeat(i + 1, len(self.X_train)).astype(str)),
-                'Score': self.clf.score_samples(self.X_train),
+                'Split': np.char.add('Split ', np.repeat(i + 1, len(X_train)).astype(str)),
+                'Score': train_scores,
                 'SampleType': np.where(is_multisplit_sample, 'Train', 'Calibration'),
             })])
+            # train_df = pd.concat([train_df, pd.DataFrame({
+            #     'Split': np.char.add('Split ', np.repeat(i + 1, len(X_train)).astype(str)),
+            #     'Score': test_scores,
+            #     'SampleType': 'Test',
+            # })])
             mu_multis.append(np.mean(X_multi_train, axis=0).reshape(1, -1))
             sigma_multis.append(np.cov(X_multi_train.T))
 
-        mu_full = np.mean(self.X_train, axis=0).reshape(1, -1)
-        sigma_full = np.cov(self.X_train.T)
+        mu_full = np.mean(X_train, axis=0).reshape(1, -1)
+        sigma_full = np.cov(X_train.T)
 
         os.makedirs(os.path.join(RESULTS_DIR, 'img', test_case_name), exist_ok=True)
 
-        self.clf.fit(self.X_train)
-        train_scores = self.clf.score_samples(self.X_train)
+        vis_clf = self.construct_clf()
+        self._clf_train(vis_clf, X_train)
+        train_scores = self._clf_predict(vis_clf, X_train)
+        # test_scores = self._clf_predict(vis_clf, X_train)
 
         train_df = pd.concat([train_df, pd.DataFrame({
-            'Sample': (np.array(range(len(self.X_train))) + 1).astype(str),
             'Split': 'Train',
             'Score': train_scores,
             'SampleType': 'Train',
         })])
+        # train_df = pd.concat([train_df, pd.DataFrame({
+        #     'Split': 'Whole train',
+        #     'Score': test_scores,
+        #     'SampleType': 'Test',
+        # })])
         train_df = train_df.reset_index(drop=True)
         cal_df = train_df[(train_df.SampleType == 'Calibration') | (train_df.Split == 'Train')]
 
@@ -449,10 +491,15 @@ class MultisplitCutoff(Cutoff):
             )
             plt.close(fig)
 
-        return cal_scores_all
+# --------------------------------- p-value cutoffs ---------------------------------
 
-class PValueCutoff(Cutoff):
+class PValueCutoff():
     base_cutoff: Cutoff
+    is_fitted = False
+    
+    @property
+    def cutoff_type(self):
+        raise NotImplementedError('Use derived class for cutoff')
 
     @property
     def full_cutoff_type(self):
@@ -468,53 +515,61 @@ class PValueCutoff(Cutoff):
         assert hasattr(self.base_cutoff, 'get_p_vals')
         assert hasattr(self.base_cutoff, 'is_fitted') and self.base_cutoff.is_fitted
 
-    def apply(self, scores):
-        p_vals = self.base_cutoff.get_p_vals(scores)
-        y_pred = self.apply_to_pvals(p_vals)
-        return y_pred
+    def fit_apply(self, X_test):
+        self.fit(X_test)
+        return self.apply(X_test)
 
-    def apply_to_pvals(self, p_vals):
-        raise NotImplementedError('Use derived class for cutoff')
-
-    def _get_thresholds(self, N):
-        raise NotImplementedError('Use derived class for cutoff')
-    
-    def _calculate_threshold(self, sorted_p_vals, train_thresholds):
-        raise NotImplementedError('Use derived class for cutoff')
-    
-    def fit(self, scores):
-        p_vals = self.base_cutoff.get_p_vals(scores)
+    def fit(self, X_test):
+        p_vals = self.base_cutoff.get_p_vals(X_test)
 
         p_vals = np.sort(p_vals)
-        train_thresholds = self._get_thresholds(len(p_vals))
-        self.threshold_ = self._calculate_threshold(p_vals, train_thresholds)
+        minimal_thresholds = self._get_minimal_thresholds(len(p_vals))
+        self.threshold_ = self._calculate_final_threshold(p_vals, minimal_thresholds)
 
         self.is_fitted = True
         return self.threshold_
+
+    def apply(self, X_test):
+        p_vals = self.base_cutoff.get_p_vals(X_test)
+        y_pred = self.apply_to_pvals(p_vals)
+        return p_vals, y_pred
 
     def apply_to_pvals(self, p_vals):
         y_pred = np.where(p_vals < self.threshold_, 0, 1)
         return y_pred
 
-    def visualize(self, scores, y_test, figure, \
+    def _get_thresholds(self, N):
+        raise NotImplementedError('Use derived class for cutoff')
+
+    def _get_threshold_names(self):
+        raise NotImplementedError('Use derived class for cutoff')
+
+    def _get_minimal_thresholds(self, N):
+        minimal_threshold = np.min( # Use the most tight threshold point
+            np.concatenate([
+                t.reshape(-1, 1) for t in self._get_thresholds(N)
+            ], axis=1
+        ), axis=1)
+        return minimal_threshold
+
+    def _calculate_final_threshold(self, sorted_p_vals, minimal_thresholds):
+        raise NotImplementedError('Use derived class for cutoff')
+
+    def visualize(self, X_test, y_test, figure, \
             test_case_name, clf_name, RESULTS_DIR, 
             zoom=False, zoom_left=True, save_plot=False):
         assert self.is_fitted, 'Cutoff needs to be fitter first'
         
-        N = len(scores)
+        N = len(X_test)
 
-        p_vals = self.base_cutoff.get_p_vals(scores)
+        p_vals = self.base_cutoff.get_p_vals(X_test)
         thresholds = self._get_thresholds(N)
+        minimal_thresholds = self._get_minimal_thresholds(N)
 
         p_val_order = np.argsort(p_vals)
         p_vals, y_test = p_vals[p_val_order], y_test[p_val_order] # sort
 
-        y_pred = np.zeros_like(p_vals)
-
-        p_vals_below_bar = np.where(p_vals < thresholds)[0]
-        if len(p_vals_below_bar) > 0:
-            first_fulfillment_index = p_vals_below_bar[0]
-            y_pred[first_fulfillment_index:] = 1
+        y_pred = self.apply_to_pvals(p_vals)
 
         x = np.array(range(N)) / N
         outlier_vec = np.where(y_test == 0, 'Outlier', 'Inlier')
@@ -528,19 +583,27 @@ class PValueCutoff(Cutoff):
                     num_elements = max(num_elements, int(1.5 * np.sum(y_pred == 0)))
                 num_elements = min(N, num_elements)
 
-                x, p_vals, outlier_vec, rejected_vec, thresholds = \
+                x, p_vals, outlier_vec, rejected_vec, minimal_thresholds = \
                     tuple([a[:num_elements] \
-                        for a in [x, p_vals, outlier_vec, rejected_vec, thresholds]
+                        for a in [x, p_vals, outlier_vec, rejected_vec, minimal_thresholds]
                     ])
+                thresholds = \
+                    [a[:num_elements] \
+                        for a in thresholds
+                    ]
             else:
                 if np.sum(y_pred == 0) < len(y_pred):
                     num_elements = max(num_elements, int(1.5 * np.sum(y_pred == 1)))
                 num_elements = min(N, num_elements)
 
-                x, p_vals, outlier_vec, rejected_vec, thresholds = \
+                x, p_vals, outlier_vec, rejected_vec, minimal_thresholds = \
                     tuple([a[-num_elements:] \
-                        for a in [x, p_vals, outlier_vec, rejected_vec, thresholds]
+                        for a in [x, p_vals, outlier_vec, rejected_vec, minimal_thresholds]
                     ])
+                thresholds = \
+                    [a[-num_elements:] \
+                        for a in thresholds
+                    ]
 
         fig, ax = figure
         sns.scatterplot(x=x, y=p_vals, 
@@ -549,18 +612,43 @@ class PValueCutoff(Cutoff):
             style_order=['Not rejected', 'Rejected'],
             edgecolor='k', linewidth=.2,
             ax=ax)
-        sns.scatterplot(x=x, y=thresholds, 
+        
+        sns.scatterplot(x=x, y=minimal_thresholds, 
             hue=['Threshold'] * num_elements,
             palette=['r'],
-            edgecolor=None, s=2,
+            edgecolor=None,
+            s=3,
+            alpha=0.7,
+            zorder=10,
             ax=ax)
+        num_threshold_markers = 1
+        
+        if len(thresholds) > 1:
+            threshold_names = self._get_threshold_names()
+            threshold_palette = sns.color_palette('Greys', len(thresholds))
+
+            for i in range(len(thresholds)):
+                num_threshold_markers += 1
+
+                sns.scatterplot(x=x, y=thresholds[i], 
+                    hue=[threshold_names[i]] * num_elements,
+                    palette=[threshold_palette[i]],
+                    edgecolor=None,
+                    s=0.75,
+                    alpha=0.7,
+                    zorder=20,
+                    ax=ax)
         
         ax.set_xlabel('p-value quantile')
         ax.set_ylabel('Value')
         ax.set_ylim(-0.01, 1.01)
         
         legend = ax.legend()
-        legend.legendHandles[-1]._sizes = [8.]
+        # resize threshold markers
+        legend.legendHandles[-num_threshold_markers]._sizes = [8.]
+        if len(thresholds) > 1:
+            for h in legend.legendHandles[-num_threshold_markers + 1:]:
+                h._sizes = [4.]
 
         ax.set_title(f'{self.cutoff_type}, alpha={self.alpha:.3f}' + \
             f', alpha={self.alpha:.3f}' + \
@@ -582,7 +670,7 @@ class FORControlCutoff(PValueCutoff):
     @property
     def cutoff_type(self):
         return 'FOR-CTL'
-    
+
     @property
     def short_cutoff_type(self):
         return 'FOR-CTL'
@@ -591,13 +679,16 @@ class FORControlCutoff(PValueCutoff):
         super().__init__(base_cutoff)
         self.alpha = alpha
         self.pi = pi
-    
+
     def _get_thresholds(self, N):
         i_array = np.array(range(N))
-        return 1 - ((1 - (i_array / N)) * (1 - self.alpha)) / (self.pi)
+        return [1 - ((1 - (i_array / N)) * (1 - self.alpha)) / (self.pi)]
 
-    def _calculate_threshold(self, sorted_p_vals, train_thresholds):
-        p_vals_below_bar = np.where(sorted_p_vals < train_thresholds)[0]
+    def _get_threshold_names(self):
+        return ['FOR threshold']
+    
+    def _calculate_final_threshold(self, sorted_p_vals, minimal_thresholds):
+        p_vals_below_bar = np.where(sorted_p_vals < minimal_thresholds)[0]
         if len(p_vals_below_bar) > 0:
             first_fulfillment_index = p_vals_below_bar[0]
             return sorted_p_vals[first_fulfillment_index]
@@ -609,7 +700,7 @@ class FNRControlCutoff(PValueCutoff):
     @property
     def cutoff_type(self):
         return 'FNR-CTL'
-    
+
     @property
     def short_cutoff_type(self):
         return 'FNR-CTL'
@@ -618,13 +709,16 @@ class FNRControlCutoff(PValueCutoff):
         super().__init__(base_cutoff)
         self.alpha = alpha
         self.pi = pi
-    
+
     def _get_thresholds(self, N):
         i_array = np.array(range(N))
-        return 1 - ((1 - (i_array / N)) - self.alpha * (1 - self.pi)) / (self.pi)
+        return [1 - ((1 - (i_array / N)) - self.alpha * (1 - self.pi)) / (self.pi)]
 
-    def _calculate_threshold(self, sorted_p_vals, train_thresholds):
-        p_vals_below_bar = np.where(sorted_p_vals < train_thresholds)[0]
+    def _get_threshold_names(self):
+        return ['FNR threshold']
+
+    def _calculate_final_threshold(self, sorted_p_vals, minimal_thresholds):
+        p_vals_below_bar = np.where(sorted_p_vals < minimal_thresholds)[0]
         if len(p_vals_below_bar) > 0:
             first_fulfillment_index = p_vals_below_bar[0]
             return sorted_p_vals[first_fulfillment_index]
@@ -636,7 +730,7 @@ class CombinedFORFNRControlCutoff(PValueCutoff):
     @property
     def cutoff_type(self):
         return 'FOR-FNR-CTL'
-    
+
     @property
     def short_cutoff_type(self):
         return 'FOR-FNR-CTL'
@@ -645,16 +739,19 @@ class CombinedFORFNRControlCutoff(PValueCutoff):
         super().__init__(base_cutoff)
         self.alpha = alpha
         self.pi = pi
-    
+
     def _get_thresholds(self, N):
         i_array = np.array(range(N))
-        return np.minimum( # use more tight one
+        return [
             1 - ((1 - (i_array / N)) * (1 - self.alpha)) / (self.pi), # FOR
             1 - ((1 - (i_array / N) - self.alpha * (1 - self.pi))) / (self.pi), # FNR
-        )
+        ]
 
-    def _calculate_threshold(self, sorted_p_vals, train_thresholds):
-        p_vals_below_bar = np.where(sorted_p_vals < train_thresholds)[0]
+    def _get_threshold_names(self):
+        return ['FOR threshold', 'FNR threshold']
+
+    def _calculate_final_threshold(self, sorted_p_vals, minimal_thresholds):
+        p_vals_below_bar = np.where(sorted_p_vals < minimal_thresholds)[0]
         if len(p_vals_below_bar) > 0:
             first_fulfillment_index = p_vals_below_bar[0]
             return sorted_p_vals[first_fulfillment_index]
@@ -667,11 +764,11 @@ class BenjaminiHochbergCutoff(PValueCutoff):
     def cutoff_type(self):
         return 'BH' \
             + (f'+pi' if self.pi is not None!= 1 else '')
-    
+
     @property
     def short_cutoff_type(self):
         return 'BH'
-    
+
     def __init__(self, base_cutoff, alpha, pi=None):
         super().__init__(base_cutoff)
         self.pi = pi
@@ -682,96 +779,16 @@ class BenjaminiHochbergCutoff(PValueCutoff):
             self.alpha = alpha / self.pi
 
     def _get_thresholds(self, N):
-        i_array = np.array(range(N))        
-        return (i_array / N) * self.alpha
+        i_array = np.array(range(N))
+        return [(i_array / N) * self.alpha]
 
-    def _calculate_threshold(self, sorted_p_vals, train_thresholds):
-        p_vals_below_bar = np.where(sorted_p_vals < train_thresholds)[0]
+    def _get_threshold_names(self):
+        return ['BH threshold']
+
+    def _calculate_final_threshold(self, sorted_p_vals, minimal_thresholds):
+        p_vals_below_bar = np.where(sorted_p_vals < minimal_thresholds)[0]
         if len(p_vals_below_bar) > 0:
             last_fulfillment_index = p_vals_below_bar[-1]
             return sorted_p_vals[last_fulfillment_index]
         else:
             return 0
-
-
-# class FORControlObjectiveCutoff(__FORControlCutoffBase):
-#     def __init__(self, inlier_rate, alpha):
-#         super().__init__(inlier_rate, alpha)
-    
-#     def _for_estimate(self, test_ecdf, threshold):
-#         return max(0, (1 - test_ecdf(threshold)) - self.inlier_rate * (1 - threshold)) / (1 - self.inlier_rate)
-    
-#     def _fnr_estimate(self, test_ecdf, threshold):
-#         return max(0, (1 - test_ecdf(threshold)) - self.inlier_rate * (1 - threshold)) / (1 - test_ecdf(threshold))\
-#             if test_ecdf(threshold) < 1 else 1 # technically 0, but undesired
-
-#     def __objective_small(test_ecdf, threshold):
-#         return (np.abs(threshold)) / 100
-
-#     def __objective_for(self, test_ecdf, threshold):
-#         for_est = self.__for_estimate(test_ecdf, threshold)
-#         return np.where(
-#                     for_est > self.alpha,
-#                     ((for_est) / self.alpha) ** 2 - 1,
-#                     0
-#                 )
-
-#     def __objective_fnr(self, test_ecdf, threshold):
-#         fnr_est = self.__fnr_estimate(test_ecdf, threshold)
-#         return np.where(
-#                     fnr_est > self.alpha,
-#                     ((fnr_est) / self.alpha) ** 2 - 1,
-#                     0
-#                 )
-    
-#     def __objective(self, test_ecdf, threshold):
-#         return self.__objective_small(test_ecdf, threshold) \
-#             + self.__objective_for(test_ecdf, threshold) \
-#             + self.__objective_fnr(test_ecdf, threshold)
-
-#     def fit(self, p_vals):
-#         super().check_input(p_vals)
-#         test_ecdf = ECDF(p_vals)
-
-#         objective_values = []
-#         all_possible_ecdf_values = np.linspace(0, 1, len(p_vals) + 1)
-#         for threshold in all_possible_ecdf_values:
-#             objective_values.append(self.__objective(test_ecdf, threshold))
-        
-#         objective_values = np.array(objective_values)
-#         best_val_idx = np.argmin(objective_values)
-        
-#         self.threshold_ = all_possible_ecdf_values[best_val_idx]
-#         return self.threshold_
-
-#     def apply(self, p_vals):
-#         y_pred = np.where(p_vals <= self.threshold_, 0, 1)
-#         return y_pred
-    
-#     # def visualize(self, p_vals):
-#     #     test_ecdf = ECDF(p_vals)
-
-#     #     objective_values = []
-#     #     objective_small_values = []
-#     #     objective_for_values = []
-#     #     objective_fnr_values = []
-
-#     #     all_possible_ecdf_values = np.linspace(0, 1, len(p_vals) + 1)
-#     #     for threshold in all_possible_ecdf_values:
-#     #         objective_values.append(self.__objective(test_ecdf, threshold))
-#     #         objective_small_values.append(self.objective_small(test_ecdf, threshold))
-#     #         objective_for_values.append(self.objective_for(test_ecdf, threshold))
-#     #         objective_fnr_values.append(self.objective_fnr(test_ecdf, threshold))
-
-#     #     plt.figure(figsize=(8, 6))
-#     #     plt.plot(all_possible_ecdf_values, objective_values)
-#     #     plt.plot(all_possible_ecdf_values, objective_for_values)
-#     #     plt.plot(all_possible_ecdf_values, objective_fnr_values)
-#     #     plt.plot(all_possible_ecdf_values, objective_small_values)
-        
-#     #     plt.legend(['Full', '1', '2', '5'])
-#     #     plt.ylabel('Objective values')
-#     #     plt.xlabel('Threshold')
-#     #     plt.savefig(f'{dataset}.png', dpi=300)
-#     #     plt.show()
-#     #     plt.close()

@@ -311,27 +311,28 @@ def prepare_metrics(y_test, y_pred, scores, occ_metrics, metric_list, pos_class_
 # %%
 from occ_cutoffs import *
 
-def get_cutoff_predictions(cutoff, scores, visualize_tests=False, apply_control_cutoffs=False,
+def get_cutoff_predictions(cutoff, X_train, X_test, inlier_rate, visualize_tests=False, apply_control_cutoffs=False,
         control_cutoff_params=None, common_visualization_params=None, special_visualization_params=None):
-    y_pred = cutoff.fit_apply(scores)
-    yield cutoff.cutoff_type, y_pred
+    scores, y_pred = cutoff.fit_apply(X_train, X_test, inlier_rate)
+    yield cutoff.cutoff_type, scores, y_pred
     
     if not isinstance(cutoff, MultisplitCutoff):
         return
     
     alpha, inlier_rate = \
         control_cutoff_params['alpha'], control_cutoff_params['inlier_rate']
-    exp, pca_variance_threshold, clf, X_train, y_test = \
+    exp, pca_variance_threshold, X_train, X_test, y_test = \
         special_visualization_params['exp'], \
         special_visualization_params['pca_variance_threshold'], \
-        special_visualization_params['clf'], \
         special_visualization_params['X_train'], \
+        special_visualization_params['X_test'], \
         special_visualization_params['y_test']
 
     # Multisplit only
     visualize = (visualize_tests and exp == 0 and pca_variance_threshold is None)
     if visualize:
-        visualize_multisplit(cutoff, scores, y_test, clf, X_train, common_visualization_params)
+        visualize_multisplit(cutoff, (X_train, X_test, y_test), \
+            common_visualization_params)
         
         # Set up plots for later
         plot_infos = prepare_cutoff_plots(cutoff, **common_visualization_params)
@@ -346,23 +347,24 @@ def get_cutoff_predictions(cutoff, scores, visualize_tests=False, apply_control_
         FNRControlCutoff(cutoff, alpha, inlier_rate),
         CombinedFORFNRControlCutoff(cutoff, alpha, inlier_rate),
     ]):
-        y_pred = control_cutoff.fit_apply(scores)
-        yield control_cutoff.full_cutoff_type, y_pred
+        scores, y_pred = control_cutoff.fit_apply(X_test)
+        yield control_cutoff.full_cutoff_type, scores, y_pred
 
         if visualize:
-            draw_cutoff_plots(control_cutoff, scores, y_test, common_visualization_params, plot_infos[cutoff_num])
+            draw_cutoff_plots(control_cutoff, X_test, y_test, \
+                common_visualization_params, plot_infos[cutoff_num])
 
-def visualize_multisplit(cutoff, scores, y_test, clf, X_train, common_visualization_params):
-    cutoff.visualize_calibration(
+def visualize_multisplit(cutoff, visualization_data, 
+        common_visualization_params):
+    cutoff.visualize_calibration(visualization_data, 
             **common_visualization_params)
-    cutoff.visualize_lottery(scores, y_test, 
+    cutoff.visualize_lottery(visualization_data, 
             **common_visualization_params,
             max_samples=100)
-    cutoff.visualize_roc(scores, y_test,
+    cutoff.visualize_roc(visualization_data,
             **common_visualization_params)
 
-    train_scores = clf.score_samples(X_train)
-    cutoff.visualize_scores(scores, y_test, train_scores,
+    cutoff.visualize_p_values(visualization_data,
             **common_visualization_params)
 
 def prepare_cutoff_plots(cutoff, test_case_name, clf_name, RESULTS_DIR):
@@ -392,13 +394,13 @@ def prepare_cutoff_plots(cutoff, test_case_name, clf_name, RESULTS_DIR):
     
     return plot_info
 
-def draw_cutoff_plots(control_cutoff, scores, y_test, common_visualization_params, plot_info):
+def draw_cutoff_plots(control_cutoff, X_test, y_test, common_visualization_params, plot_info):
     ((fig, axs), save_plot) = plot_info
     zoom_left = isinstance(control_cutoff, BenjaminiHochbergCutoff)
 
     figure = (fig, axs[0])
     zoom = False
-    control_cutoff.visualize(scores, y_test, figure, \
+    control_cutoff.visualize(X_test, y_test, figure, \
         **common_visualization_params, \
         zoom=zoom, zoom_left=zoom_left, save_plot=False
     )
@@ -406,7 +408,7 @@ def draw_cutoff_plots(control_cutoff, scores, y_test, common_visualization_param
     figure = (fig, axs[1])
     zoom = True
     save_plot = save_plot
-    control_cutoff.visualize(scores, y_test, figure, \
+    control_cutoff.visualize(X_test, y_test, figure, \
         **common_visualization_params, \
         zoom=zoom, zoom_left=zoom_left, save_plot=save_plot
     )

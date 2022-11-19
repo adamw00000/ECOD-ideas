@@ -40,10 +40,7 @@ def run_tests(metric_list, alpha_metric, test_description, get_results_dir, base
 
                     np.random.seed(exp)
                     X_train, X_test, y_test = apply_PCA_threshold(X_train_orig, X_test_orig, y_test_orig, pca_variance_threshold)
-                    clf = get_occ_from_name(clf_name)
-
-                    clf.fit(X_train)
-                    scores = clf.score_samples(X_test)
+                    construct_clf = lambda clf_name=clf_name: get_occ_from_name(clf_name)
 
                     extra_params = {
                         'control_cutoff_params': {
@@ -58,21 +55,21 @@ def run_tests(metric_list, alpha_metric, test_description, get_results_dir, base
                         'special_visualization_params': {
                             'exp': exp,
                             'pca_variance_threshold': pca_variance_threshold,
-                            'clf': clf,
                             'X_train': X_train,
+                            'X_test': X_test,
                             'y_test': y_test,
                         },
                     }
 
-                    for cutoff in get_cutoffs(inlier_rate, dim, resampling_repeats, X_train, clf, alpha):
+                    for cutoff in get_cutoffs(construct_clf, alpha, resampling_repeats):
                         if not apply_multisplit_to_baseline(clf_name) and (isinstance(cutoff, MultisplitCutoff) or isinstance(cutoff, MultisplitThresholdCutoff)):
                             continue
 
                         np.random.seed(exp)
-                        predictions = get_cutoff_predictions(cutoff, scores, 
+                        predictions = get_cutoff_predictions(cutoff, X_train, X_test, inlier_rate, 
                             visualize_tests, apply_control_cutoffs, **extra_params)
 
-                        for cutoff_name, y_pred in predictions:
+                        for cutoff_name, scores, y_pred in predictions:
                             occ_metrics = {
                                 'Dataset': test_case_name,
                                 'Method': clf_name + (f"+PCA{pca_variance_threshold:.1f}" if pca_variance_threshold is not None else ""),
