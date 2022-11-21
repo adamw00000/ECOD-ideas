@@ -17,7 +17,9 @@ baselines = [
     # 'GeomMedian',
     'Mahalanobis',
     # 'OC-SVM',
-    # 'IForest',
+    'IForest',
+    'HBOS',
+    'CBLOF',
 ]
 def get_cutoffs(construct_clf, alpha, resampling_repeats) -> List[Cutoff]:
     return [

@@ -183,22 +183,46 @@ from ecod_v2 import ECODv2
 from ecod_v2_min import ECODv2Min
 from sklearn.svm import OneClassSVM
 from sklearn.ensemble import IsolationForest
+from pyod.models.hbos import HBOS
+from pyod.models.cblof import CBLOF
 
-def get_occ_from_name(clf_name):
+class CBLOFWrapper():
+    def __init__(self, model):
+        assert isinstance(model, CBLOF)
+        self.model = model
+    
+    def fit(self, X_train):
+        is_fitted = False
+        while not is_fitted:
+            try:
+                self.model.fit(X_train)
+                is_fitted = True
+            except ValueError:
+                self.model.n_clusters -= 1
+        return self
+
+    def score_samples(self, X):
+        return -self.model.decision_function(X)
+
+def get_occ_from_name(clf_name, random_state, contamination=0.001):
     if clf_name == 'ECOD':
-        clf = PyODWrapper(ECOD())
+        clf = PyODWrapper(ECOD(contamination=contamination))
     elif clf_name == 'ECODv2':
-        clf = PyODWrapper(ECODv2())
+        clf = PyODWrapper(ECODv2(contamination=contamination))
     elif clf_name == 'ECODv2Min':
-        clf = PyODWrapper(ECODv2Min())
+        clf = PyODWrapper(ECODv2Min(contamination=contamination))
+    elif clf_name == 'HBOS':
+        clf = PyODWrapper(HBOS(n_bins='auto', contamination=contamination))
+    elif clf_name == 'CBLOF':
+        clf = CBLOFWrapper(CBLOF(contamination=contamination, random_state=random_state))
     elif clf_name == 'GeomMedian':
         clf = GeomMedianDistance()
     elif clf_name == 'Mahalanobis':
         clf = Mahalanobis()
     elif clf_name == 'OC-SVM':
-        clf = OneClassSVM()
+        clf = OneClassSVM(nu=contamination)
     elif clf_name == 'IForest':
-        clf = IsolationForest()
+        clf = IsolationForest(contamination=contamination, random_state=random_state)
     return clf
 
 # %%
@@ -247,7 +271,7 @@ def prepare_resampling_threshold(clf, X_train, resampling_repeats, inlier_rate, 
 
 # %%
 def apply_multisplit_to_baseline(baseline):
-    return baseline in ['ECODv2', 'Mahalanobis']
+    return baseline in ['ECODv2', 'Mahalanobis', 'IForest', 'HBOS', 'CBLOF']
 
 # %%
 from sklearn import metrics

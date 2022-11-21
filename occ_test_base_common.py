@@ -40,7 +40,7 @@ def run_tests(metric_list, alpha_metrics, test_description, get_results_dir, bas
 
                     np.random.seed(exp)
                     X_train, X_test, y_test = apply_PCA_threshold(X_train_orig, X_test_orig, y_test_orig, pca_variance_threshold)
-                    construct_clf = lambda clf_name=clf_name: get_occ_from_name(clf_name)
+                    construct_clf = lambda clf_name=clf_name, exp=exp: get_occ_from_name(clf_name, random_state=exp)
 
                     extra_params = {
                         'control_cutoff_params': {
