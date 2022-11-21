@@ -145,9 +145,12 @@ class Mahalanobis():
             # self.sigma_inv = np.linalg.inv(np.cov(X.T))
 
             # use pseudoinverse
-            self.sigma_inv = np.linalg.pinv(np.cov(X.T))
-            # another idea: add small number to diagonal
-            # self.sigma_inv = np.linalg.inv(np.cov(X.T) + EPS * np.eye(X.shape[1]))
+            try:
+                self.sigma_inv = np.linalg.pinv(np.cov(X.T))
+            except:
+                # another idea: add small number to diagonal
+                EPS = 1e-5
+                self.sigma_inv = np.linalg.inv(np.cov(X.T) + EPS * np.eye(X.shape[1]))
         else:
             self.sigma_inv = np.eye(1)
             
