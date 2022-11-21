@@ -183,7 +183,8 @@ from ecod_v2 import ECODv2
 from ecod_v2_min import ECODv2Min
 from sklearn.svm import OneClassSVM
 from sklearn.ensemble import IsolationForest
-from pyod.models.hbos import HBOS
+# from pyod.models.hbos import HBOS
+from hbos import HBOS
 from pyod.models.cblof import CBLOF
 
 class CBLOFWrapper():
