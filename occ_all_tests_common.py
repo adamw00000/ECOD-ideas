@@ -199,7 +199,11 @@ class CBLOFWrapper():
                 self.model.fit(X_train)
                 is_fitted = True
             except ValueError:
-                self.model.n_clusters -= 1
+                self.model.n_clusters //= 2
+                if self.model.n_clusters == 1:
+                    self.model.n_clusters = 8
+                    self.model.alpha *= 0.75
+                    self.model.beta *= 0.75
         return self
 
     def score_samples(self, X):
