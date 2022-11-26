@@ -508,49 +508,6 @@ class MultisplitCutoff(Cutoff):
         )
         plt.close(fig)
 
-        if clf_name == 'Mahalanobis':
-            conf_matrix_sigma = np.eye(self.resampling_repeats + 1)
-            for i, sim1 in enumerate(sigma_multis + [sigma_full]):
-                for j, sim2 in enumerate(sigma_multis + [sigma_full]):
-                    conf_matrix_sigma[i, j] = np.linalg.norm(sim1 - sim2, 'fro')
-            
-            conf_matrix_mu = np.eye(self.resampling_repeats + 1)
-            for i, sim1 in enumerate(mu_multis + [mu_full]):
-                for j, sim2 in enumerate(mu_multis + [mu_full]):
-                    conf_matrix_mu[i, j] = np.linalg.norm(sim1 - sim2, 2)
-
-            labels = list(np.char.add('Cal', (np.array(range(self.resampling_repeats)) + 1).astype(str)))\
-                + ['Train']
-
-            sns.reset_defaults()
-
-            fig, axs = plt.subplots(1, 2, figsize=(20, 8))
-            fig.suptitle(f'{test_case_name} - pairwise distances between {clf_name} params')
-
-            ax = axs[0]
-            disp = metrics.ConfusionMatrixDisplay(
-                confusion_matrix=conf_matrix_sigma,
-                display_labels=labels,
-            )
-            disp.plot(ax=ax)
-            ax.set_title(f'Covariance matrices (Frobenius norm)')
-
-            ax = axs[1]
-            disp = metrics.ConfusionMatrixDisplay(
-                confusion_matrix=conf_matrix_mu,
-                display_labels=labels,
-            )
-            disp.plot(ax=ax)
-            ax.set_title(f'Mean vectors')
-
-            plt.savefig(
-                os.path.join(RESULTS_DIR, 'img', test_case_name, f'diagnostic-params-{clf_name}-{self.cutoff_type}.png'),
-                dpi=150,
-                bbox_inches='tight',
-                facecolor='white',
-            )
-            plt.close(fig)
-
 # --------------------------------- p-value cutoffs ---------------------------------
 
 class PValueCutoff():
