@@ -3,7 +3,7 @@ from occ_cutoffs import *
 from occ_test_base_common import run_tests
 from typing import List
 
-metric_list = ['T1E']
+metric_list = ['T1E', 'Time']
 alpha_metrics = ['T1E']
 
 test_description = 'Type I Error tests'

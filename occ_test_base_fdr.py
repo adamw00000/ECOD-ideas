@@ -4,7 +4,7 @@ from occ_test_base_common import run_tests
 from typing import List
 
 metric_list = ['AUC', 'ACC', 'PRE', 'REC', 'F1', 
-    'T1E', 'FOR', 'FNR', '#', '#FD', '#D', 'FDR']
+    'T1E', 'FOR', 'FNR', '#', '#FD', '#D', 'FDR', 'Time']
 alpha_metrics = ['FDR', 'FOR', 'FNR']
 
 test_description = 'FDR tests'

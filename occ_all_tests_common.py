@@ -349,12 +349,15 @@ def prepare_metrics(y_test, y_pred, scores, occ_metrics, metric_list, pos_class_
     return method_metrics
 
 # %%
+import time
 from occ_cutoffs import *
 
 def get_cutoff_predictions(cutoff, X_train, X_test, inlier_rate, visualize_tests=False, apply_control_cutoffs=False,
         control_cutoff_params=None, common_visualization_params=None, special_visualization_params=None):
+    start_time = time.perf_counter()
     scores, y_pred = cutoff.fit_apply(X_train, X_test, inlier_rate)
-    yield cutoff.cutoff_type, scores, y_pred
+    elapsed = time.perf_counter() - start_time
+    yield cutoff.cutoff_type, scores, y_pred, elapsed
     
     if not isinstance(cutoff, MultisplitCutoff):
         return
@@ -387,8 +390,10 @@ def get_cutoff_predictions(cutoff, X_train, X_test, inlier_rate, visualize_tests
         FNRControlCutoff(cutoff, alpha, inlier_rate),
         CombinedFORFNRControlCutoff(cutoff, alpha, inlier_rate),
     ]):
+        start_time = time.perf_counter()
         scores, y_pred = control_cutoff.fit_apply(X_test)
-        yield control_cutoff.full_cutoff_type, scores, y_pred
+        elapsed = time.perf_counter() - start_time
+        yield control_cutoff.full_cutoff_type, scores, y_pred, elapsed
 
         if visualize:
             draw_cutoff_plots(control_cutoff, X_test, y_test, \

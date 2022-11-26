@@ -70,13 +70,14 @@ def run_tests(metric_list, alpha_metrics, test_description, get_results_dir, bas
                         predictions = get_cutoff_predictions(cutoff, X_train, X_test, inlier_rate, 
                             visualize_tests, apply_control_cutoffs, **extra_params)
 
-                        for cutoff_name, scores, y_pred in predictions:
+                        for cutoff_name, scores, y_pred, elapsed in predictions:
                             occ_metrics = {
                                 'Dataset': test_case_name,
                                 'Method': clf_name + (f"+PCA{pca_variance_threshold:.1f}" if pca_variance_threshold is not None else ""),
                                 'Cutoff': cutoff_name,
                                 'Exp': exp + 1,
                                 '#': len(y_test),
+                                'Time': elapsed,
                             }
 
                             method_metrics = prepare_metrics(y_test, y_pred, scores, occ_metrics, metric_list, pos_class_only=test_inliers_only)

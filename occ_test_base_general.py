@@ -3,7 +3,7 @@ from occ_cutoffs import *
 from occ_test_base_common import run_tests
 from typing import List
 
-metric_list = ['AUC', 'ACC', 'PRE', 'REC', 'F1', 'T1E', 'FOR', 'FDR']
+metric_list = ['AUC', 'ACC', 'PRE', 'REC', 'F1', 'T1E', 'FOR', 'FDR', 'Time']
 alpha_metrics = []
 
 test_description = 'General tests'
