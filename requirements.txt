@@ -8,4 +8,6 @@ statsmodels==0.13.1
 joblib==1.0.1
 pyod==1.0.1
 IPython==7.24.1
+tensorflow==2.6.0
+keras==2.6.0
 torch
