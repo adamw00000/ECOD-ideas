@@ -104,6 +104,9 @@ def run_tests(metric_list, alpha_metrics, test_description, get_results_dir, bas
     df = pd.DataFrame.from_records(full_results)
     df
 
+    df \
+        .to_csv(os.path.join(RESULTS_DIR, f'{DATASET_TYPE}-raw-results.csv'))
+
     pivots = {}
     for metric in metric_list:
         metric_df = df
