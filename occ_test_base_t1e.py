@@ -10,6 +10,7 @@ test_description = 'Type I Error tests'
 get_results_dir = lambda dataset_type, alpha: f'results_{dataset_type}_t1e_{alpha:.2f}'
 
 baselines = [
+    'A^3',
     # 'ECOD',
     'ECODv2',
     # 'ECODv2Min',
@@ -25,7 +26,7 @@ def get_cutoffs(construct_clf, alpha, resampling_repeats) -> List[Cutoff]:
         EmpiricalCutoff(construct_clf),
         # ChiSquaredCutoff(construct_clf, dim),
         # BootstrapThresholdCutoff(construct_clf, resampling_repeats),
-        MultisplitThresholdCutoff(construct_clf, resampling_repeats),
+        # MultisplitThresholdCutoff(construct_clf, resampling_repeats),
         # MultisplitCutoff(construct_clf, alpha, resampling_repeats=resampling_repeats, median_multiplier=2),
         # MultisplitCutoff(construct_clf, alpha, resampling_repeats=1, median_multiplier=2),
         MultisplitCutoff(construct_clf, alpha, resampling_repeats=resampling_repeats, median_multiplier=1),

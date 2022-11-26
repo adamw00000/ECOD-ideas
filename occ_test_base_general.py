@@ -10,6 +10,7 @@ test_description = 'General tests'
 get_results_dir = lambda dataset_type, alpha: f'results_{dataset_type}'
 
 baselines = [
+    'A^3',
     'ECOD',
     'ECODv2',
     'ECODv2Min',

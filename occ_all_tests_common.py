@@ -186,6 +186,7 @@ from sklearn.ensemble import IsolationForest
 # from pyod.models.hbos import HBOS
 from hbos import HBOS
 from pyod.models.cblof import CBLOF
+from A3_adapter import A3Adapter
 
 class CBLOFWrapper():
     def __init__(self, model):
@@ -209,7 +210,7 @@ class CBLOFWrapper():
     def score_samples(self, X):
         return -self.model.decision_function(X)
 
-def get_occ_from_name(clf_name, random_state, contamination=0.001):
+def get_occ_from_name(clf_name, random_state, RESULTS_DIR, contamination=0.001):
     if clf_name == 'ECOD':
         clf = PyODWrapper(ECOD(contamination=contamination))
     elif clf_name == 'ECODv2':
@@ -228,6 +229,8 @@ def get_occ_from_name(clf_name, random_state, contamination=0.001):
         clf = OneClassSVM(nu=contamination)
     elif clf_name == 'IForest':
         clf = IsolationForest(contamination=contamination, random_state=random_state)
+    elif clf_name == 'A^3':
+        clf = A3Adapter(max_target_epochs=200, max_a3_epochs=1000, patience=30, verbose=0, model_dir=RESULTS_DIR)
     return clf
 
 # %%
@@ -276,7 +279,7 @@ def prepare_resampling_threshold(clf, X_train, resampling_repeats, inlier_rate, 
 
 # %%
 def apply_multisplit_to_baseline(baseline):
-    return baseline in ['ECODv2', 'Mahalanobis', 'IForest', 'HBOS', 'CBLOF']
+    return baseline not in ['ECOD', 'ECODv2Min', 'GeomMedian']
 
 # %%
 from sklearn import metrics
