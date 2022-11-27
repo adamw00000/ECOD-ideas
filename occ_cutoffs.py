@@ -249,11 +249,12 @@ class MultisplitCutoff(Cutoff):
             max_samples=100):
         X_train, X_test, y_test = visualization_data
 
-        # constant random state is important for consistency
-        sss = StratifiedShuffleSplit(n_splits=1, random_state=42, train_size=min(len(X_test), max_samples))
-        for indices, _ in sss.split(X_test, y_test):
-            # executes only once
-            X_test, y_test = X_test[indices], y_test[indices]
+        if len(X_test) > max_samples:
+            # constant random state is important for consistency
+            sss = StratifiedShuffleSplit(n_splits=1, random_state=42, train_size=min(len(X_test), max_samples))
+            for indices, _ in sss.split(X_test, y_test):
+                # executes only once
+                X_test, y_test = X_test[indices], y_test[indices]
 
         p_vals_all = np.zeros((self.resampling_repeats, len(X_test)))
         for i in range(self.resampling_repeats):
