@@ -730,7 +730,7 @@ class FNRControlCutoff(PValueCutoff):
 
     def _get_thresholds(self, N):
         i_array = np.array(range(N))
-        return [1 - ((1 - (i_array / N)) - self.alpha * (1 - self.pi)) / (self.pi)]
+        return [1 - ((1 - (i_array / N)) - self.alpha) / (self.pi)]
 
     def _get_threshold_names(self):
         return ['FNR threshold']
@@ -762,7 +762,7 @@ class CombinedFORFNRControlCutoff(PValueCutoff):
         i_array = np.array(range(N))
         return [
             1 - ((1 - (i_array / N)) * (1 - self.alpha)) / (self.pi), # FOR
-            1 - ((1 - (i_array / N) - self.alpha * (1 - self.pi))) / (self.pi), # FNR
+            1 - ((1 - (i_array / N) - self.alpha)) / (self.pi), # FNR
         ]
 
     def _get_threshold_names(self):
