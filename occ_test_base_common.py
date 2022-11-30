@@ -93,7 +93,7 @@ def run_tests(metric_list, alpha_metrics, test_description, get_results_dir, bas
                                 full_results.append(method_metrics)
 
             df = pd.DataFrame.from_records(results)
-            df.to_csv(os.path.join(RESULTS_DIR, 'raw', f'{DATASET_TYPE}-{test_case_name}.csv'))
+            df.to_csv(raw_results_path, index=False)
         df = fill_nan_values(df)
 
         dataset_df = df[df.Dataset == test_case_name]
@@ -111,8 +111,9 @@ def run_tests(metric_list, alpha_metrics, test_description, get_results_dir, bas
         res_df.to_csv(os.path.join(RESULTS_DIR, f'{DATASET_TYPE}-{test_case_name}.csv'))
 
     # Full result pivots
-    df = pd.DataFrame.from_records(full_results).reset_index(drop=True)
-    df.to_csv(os.path.join(RESULTS_DIR, f'{DATASET_TYPE}-raw-results.csv'))
+    df = pd.DataFrame.from_records(full_results)\
+        .reset_index(drop=True)
+    df.to_csv(os.path.join(RESULTS_DIR, f'{DATASET_TYPE}-raw-results.csv'), index=False)
     df = fill_nan_values(df)
 
     aggregate_results(df, metric_list, alpha_metrics, \
