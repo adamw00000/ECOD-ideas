@@ -477,3 +477,32 @@ def round_and_multiply_metric(df, metric):
     else:
         df = df.round(3)
     return df
+
+# %%
+from occ_all_tests_common import *
+
+def aggregate_results(df, metric_list, alpha_metrics, RESULTS_DIR, DATASET_TYPE, alpha):
+    for metric in metric_list:
+        metric_df = df
+        
+        pivot = metric_df \
+            .pivot_table(values=metric, index=['Dataset'], columns=['Method', 'Cutoff'], dropna=False)
+
+        pivot = pivot.dropna(how='all')
+        pivot = append_mean_row(pivot)
+        pivot = round_and_multiply_metric(pivot, metric)
+
+        pivot \
+            .to_csv(os.path.join(RESULTS_DIR, f'{DATASET_TYPE}-all-{metric}.csv'))
+        pivot \
+            .transpose() \
+            .to_csv(os.path.join(RESULTS_DIR, f'{DATASET_TYPE}-all-{metric}-transposed.csv'))
+
+        if metric in alpha_metrics:
+            append_mean_row(pivot < alpha) \
+                .to_csv(os.path.join(RESULTS_DIR, f'{DATASET_TYPE}-all-{metric}-alpha.csv'))
+            append_mean_row(pivot < alpha) \
+                .transpose() \
+                .to_csv(os.path.join(RESULTS_DIR, f'{DATASET_TYPE}-all-{metric}-alpha-transposed.csv'))
+
+# %%

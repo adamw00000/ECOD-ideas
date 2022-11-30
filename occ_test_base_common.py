@@ -104,25 +104,7 @@ def run_tests(metric_list, alpha_metrics, test_description, get_results_dir, bas
     df = pd.DataFrame.from_records(full_results)
     df
 
-    df \
-        .to_csv(os.path.join(RESULTS_DIR, f'{DATASET_TYPE}-raw-results.csv'))
+    df.to_csv(os.path.join(RESULTS_DIR, f'{DATASET_TYPE}-raw-results.csv'))
 
-    pivots = {}
-    for metric in metric_list:
-        metric_df = df
-        # if metric == 'AUC':
-        #     metric_df = df.loc[np.isin(df.Cutoff, ['Empirical'])]
-        
-        pivot = metric_df \
-            .pivot_table(values=metric, index=['Dataset'], columns=['Method', 'Cutoff'], dropna=False)
-
-        pivot = pivot.dropna(how='all')
-        pivots[metric] = pivot
-        pivot = append_mean_row(pivot)
-        pivot = round_and_multiply_metric(pivot, metric)
-
-        pivot \
-            .to_csv(os.path.join(RESULTS_DIR, f'{DATASET_TYPE}-all-{metric}.csv'))
-
-    for alpha_metric in alpha_metrics:
-        append_mean_row(pivots[alpha_metric] < alpha).to_csv(os.path.join(RESULTS_DIR, f'{DATASET_TYPE}-all-{alpha_metric}-alpha.csv'))
+    aggregate_results(df, metric_list, alpha_metrics, \
+        RESULTS_DIR, DATASET_TYPE, alpha)
