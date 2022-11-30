@@ -113,7 +113,7 @@ class __ResamplingThresholdCutoffBase(Cutoff):
             test_scores_all[i, :] = test_scores
             thresholds[i] = emp_quantile
 
-        test_scores = np.median(test_scores_all, axis=0)
+        test_scores = np.mean(test_scores_all, axis=0)
         resampling_threshold = np.mean(thresholds)
         return test_scores, resampling_threshold
 
