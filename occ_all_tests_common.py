@@ -286,7 +286,7 @@ from sklearn import metrics
 
 def get_metrics(y_true, y_pred, scores, pos_class_only=False, \
         default_pre=0, default_rec=0, default_f1=0, \
-        default_fdr=0, default_fnr=0, default_for=0):
+        default_fdr=np.nan, default_fnr=np.nan, default_for=np.nan):
     false_detections = np.sum((y_pred == 0) & (y_true == 1))
     detections = np.sum(y_pred == 0)
     if detections != 0:
@@ -428,14 +428,14 @@ def prepare_cutoff_plots(cutoff, test_case_name, clf_name, RESULTS_DIR):
     for_fnr_fig, for_fnr_axs = plt.subplots(1, 2, figsize=(24, 8))
     for_fnr_fig.suptitle(title)
 
-    plot_info = [ 
-            # ((fig, axs), save_plot)
-            ((bh_fig, bh_axs[0, :]), False), 
-            ((bh_fig, bh_axs[1, :]), True),
-            ((for_fig, for_axs), True),
-            ((fnr_fig, fnr_axs), True),
-            ((for_fnr_fig, for_fnr_axs), True),
-        ]
+    plot_info = [
+        # ((fig, axs), save_plot)
+        ((bh_fig, bh_axs[0, :]), False), 
+        ((bh_fig, bh_axs[1, :]), True),
+        ((for_fig, for_axs), True),
+        ((fnr_fig, fnr_axs), True),
+        ((for_fnr_fig, for_fnr_axs), True),
+    ]
     
     return plot_info
 
@@ -476,6 +476,24 @@ def round_and_multiply_metric(df, metric):
         df = (df * 100).round(2)
     else:
         df = df.round(3)
+    return df
+
+# %%
+default_metric_values = {
+    'PRE': 0,
+    'REC': 0,
+    'F1': 0,
+    'FDR': 0,
+    'FOR': 0,
+    'FNR': 0,
+}
+def fill_nan_values(df, default_values=default_metric_values):
+    for metric, default in default_values.items():
+        if metric not in df.columns:
+            continue
+
+        df[metric].fillna(default)
+
     return df
 
 # %%
