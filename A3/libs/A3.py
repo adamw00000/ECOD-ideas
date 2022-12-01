@@ -228,9 +228,12 @@ class A3:
             try:
                 self.anomaly_network.save_weights(filepath=str((basepath / prefix).with_suffix(f".anomaly{suffix}")), *args, **kwargs)
             except AttributeError:
-                print("Cannot save the anomaly network. May be ignored if it is only a layer.")
+                pass
+                # print("Cannot save the anomaly network. May be ignored if it is only a layer.")
         # Save alarm
+        tf.get_logger().setLevel('ERROR')
         self.alarm_network.save(filepath=(basepath / prefix).with_suffix(f".alarm{suffix}"), *args, **kwargs)
+        tf.get_logger().setLevel('WARNING')
 
         # There is a bug in TF<2.2 which causes the save operation to fail for .h5 files
         # Dirty hack: append random number to all layers

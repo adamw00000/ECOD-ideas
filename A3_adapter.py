@@ -4,6 +4,8 @@ import tempfile
 import numpy as np
 import tensorflow as tf
 
+from pathlib import Path
+
 from A3.libs.A3 import A3
 from A3.libs.architecture import dense_ae, alarm_net, VariationalAutoEncoder, RandomNoise
 
@@ -15,7 +17,7 @@ class A3Adapter():
         self.patience = patience
         self.model_dir = model_dir
 
-    def fit(self, X_train):
+    def fit(self, X_train, y_train=None):
         N = len(X_train)
         val_indices = np.random.choice(range(N), size=int(0.1 * N), replace=False)
         val_mask = np.where(np.isin(range(N), val_indices), True, False)
@@ -92,6 +94,13 @@ class A3Adapter():
     
     def score_samples(self, samples):
         return 1 - self.model.predict(samples).reshape(-1)
+
+    def save(self, dir_path):
+        self.model.save(Path(dir_path), prefix='net', suffix='.h5')
+
+    # TODO
+    # def load(self, dir_path):
+    #     self.model.load_all(Path(dir_path), suffix='.h5')
 
 
 class SaveBestModelMemory(tf.keras.callbacks.Callback):

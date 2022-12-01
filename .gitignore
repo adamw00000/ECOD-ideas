@@ -5,3 +5,6 @@ occ-data/
 *.png
 *.pdf
 *.zip
+*.h5
+*.joblib
+*.npy

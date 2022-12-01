@@ -260,6 +260,48 @@ def get_occ_from_name(clf_name, random_state, RESULTS_DIR, contamination=0.001):
         raise NotImplementedError('OCC method not implemented')
 
 # %%
+import joblib
+
+def serialize_clfs(cutoff, exp_dir, clf_name):
+    clfs_path = os.path.join(exp_dir, 'clfs', cutoff.cutoff_type)
+    os.makedirs(clfs_path, exist_ok=True)
+    
+    for i, clf in enumerate(cutoff.get_clfs()):
+        if isinstance(clf, A3Adapter):
+            model_dir = os.path.join(clfs_path, f'{clf_name}_{i}')
+            clf.save(model_dir)
+        else:                                    
+            joblib.dump(clf,
+                os.path.join(clfs_path, f'{clf_name}_{i}.joblib')
+            )
+
+# %%
+def save_experiment_data(exp_dir, X_train_orig, X_test_orig, y_test_orig, oracle_data):
+    occ_data_path = os.path.join(exp_dir, 'occ-data')
+    os.makedirs(occ_data_path, exist_ok=True)
+
+    with open(os.path.join(occ_data_path, 'X_train.npy'), 'wb') as f:
+        np.save(f, X_train_orig)
+    with open(os.path.join(occ_data_path, 'X_test.npy'), 'wb') as f:
+        np.save(f, X_test_orig)
+    with open(os.path.join(occ_data_path, 'y_test.npy'), 'wb') as f:
+        np.save(f, y_test_orig)
+
+    oracle_data_path = os.path.join(exp_dir, 'oracle-data')
+    os.makedirs(oracle_data_path, exist_ok=True)
+
+    X_train, y_train, X_test, y_test = oracle_data
+
+    with open(os.path.join(oracle_data_path, 'X_train.npy'), 'wb') as f:
+        np.save(f, X_train)
+    with open(os.path.join(oracle_data_path, 'y_train.npy'), 'wb') as f:
+        np.save(f, y_train)
+    with open(os.path.join(oracle_data_path, 'X_test.npy'), 'wb') as f:
+        np.save(f, X_test)
+    with open(os.path.join(oracle_data_path, 'y_test.npy'), 'wb') as f:
+        np.save(f, y_test)
+
+# %%
 def filter_inliers(X_test, y_test):
     inliers = np.where(y_test == 1)[0]
     y_test = y_test[inliers]
@@ -381,11 +423,13 @@ from occ_cutoffs import *
 def get_cutoff_predictions(cutoff, X_train, X_test, inlier_rate,
         visualize_tests=False, apply_control_cutoffs=False, control_cutoff_params=None,
         common_visualization_params=None, special_visualization_params=None,
-        y_train=None, y_test=None):
+        y_train=None, y_test=None, exp_dir=None, clf_name=None):
     start_time = time.perf_counter()
     scores, y_pred = cutoff.fit_apply(X_train, X_test, inlier_rate, y_train=y_train)
     elapsed = time.perf_counter() - start_time
     yield cutoff.cutoff_type, scores, y_pred, elapsed
+
+    serialize_clfs(cutoff, exp_dir, clf_name)
     
     alpha, inlier_rate = \
         control_cutoff_params['alpha'], control_cutoff_params['inlier_rate']

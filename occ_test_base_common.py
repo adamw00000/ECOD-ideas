@@ -18,14 +18,15 @@ def run_tests(metric_list, alpha_metrics, test_description, get_results_dir, bas
 
     RESULTS_DIR = get_results_dir(DATASET_TYPE, alpha)
     os.makedirs(RESULTS_DIR, exist_ok=True)
-    os.makedirs(os.path.join(RESULTS_DIR, 'raw'), exist_ok=True)
 
     for (test_case_name, get_dataset_function) in get_all_distribution_configs():
         print(f'{test_description}: {test_case_name}' + \
             f' (alpha = {alpha:.2f})' if alpha is not None else '')
+        os.makedirs(os.path.join(RESULTS_DIR, test_case_name), exist_ok=True)
+
         results = []
 
-        raw_results_path = os.path.join(RESULTS_DIR, 'raw', f'raw-{DATASET_TYPE}-{test_case_name}.csv')
+        raw_results_path = os.path.join(RESULTS_DIR, test_case_name, f'results-raw-{test_case_name}.csv')
         if not recalculate_existing_results and os.path.exists(raw_results_path):
             df = pd.read_csv(raw_results_path)
             results = df.to_dict('records')
@@ -37,6 +38,10 @@ def run_tests(metric_list, alpha_metrics, test_description, get_results_dir, bas
                 X_train_orig, X_test_orig, y_test_orig = get_dataset_function()
                 oracle_data = convert_occ_dataset_to_binary(X_train_orig, X_test_orig, y_test_orig)
                 inlier_rate = np.mean(y_test_orig)
+
+                exp_dir = os.path.join(RESULTS_DIR, test_case_name, 'experiments', str(exp))
+                save_experiment_data(exp_dir, 
+                    X_train_orig, X_test_orig, y_test_orig, oracle_data)
 
                 if test_inliers_only:
                     # include only inliers
@@ -80,7 +85,7 @@ def run_tests(metric_list, alpha_metrics, test_description, get_results_dir, bas
                             np.random.seed(exp)
                             predictions = get_cutoff_predictions(cutoff, X_train, X_test, inlier_rate, 
                                 visualize_tests, apply_control_cutoffs, **extra_params,
-                                y_train=y_train, y_test=y_test)
+                                y_train=y_train, y_test=y_test, exp_dir=exp_dir, clf_name=clf_name)
 
                             for cutoff_name, scores, y_pred, elapsed in predictions:
                                 occ_metrics = {
@@ -113,6 +118,7 @@ def run_tests(metric_list, alpha_metrics, test_description, get_results_dir, bas
         res_df = append_mean_row(res_df)
         display(res_df)
         res_df.to_csv(os.path.join(RESULTS_DIR, f'{DATASET_TYPE}-{test_case_name}.csv'))
+        res_df.to_csv(os.path.join(RESULTS_DIR, test_case_name, f'results-aggregate-{test_case_name}.csv'))
 
     # Full result pivots
     df = pd.DataFrame.from_records(full_results)\

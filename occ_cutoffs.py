@@ -1,6 +1,5 @@
 import numpy as np
 import scipy.stats
-from statsmodels.distributions.empirical_distribution import ECDF
 from sklearn.model_selection import StratifiedShuffleSplit
 
 import os
@@ -37,6 +36,12 @@ class Cutoff():
     def fit_apply(self, X_train, X_test, inlier_rate, y_train=None):
         self.fit(X_train, y_train)
         return self.apply(X_test, inlier_rate)
+    
+    def get_clfs(self):
+        raise NotImplementedError('Use derived class for cutoff')
+    
+    def set_clfs(self, clfs):
+        raise NotImplementedError('Use derived class for cutoff')
 
 
 class EmpiricalCutoff(Cutoff):
@@ -54,6 +59,13 @@ class EmpiricalCutoff(Cutoff):
         self.threshold_ = np.quantile(scores, q=1 - inlier_rate)
         y_pred = np.where(scores > self.threshold_, 1, 0)
         return scores, y_pred
+    
+    def get_clfs(self):
+        return [self.clf]
+    
+    def set_clfs(self, clfs):
+        self.clf = clfs[0]
+
 
 
 class ChiSquaredCutoff(Cutoff):
@@ -73,6 +85,12 @@ class ChiSquaredCutoff(Cutoff):
         scores = self._clf_predict(self.clf, X_test)
         y_pred = np.where(scores > self.threshold_, 1, 0)
         return scores, y_pred
+    
+    def get_clfs(self):
+        return [self.clf]
+    
+    def set_clfs(self, clfs):
+        self.clf = clfs[0]
 
 
 class __ResamplingThresholdCutoffBase(Cutoff):
@@ -129,6 +147,12 @@ class __ResamplingThresholdCutoffBase(Cutoff):
         test_scores, threshold_ = self.__get_resampling_predictions(X_test, inlier_rate)
         y_pred = np.where(test_scores > threshold_, 1, 0)
         return test_scores, y_pred
+    
+    def get_clfs(self):
+        return self.clfs
+    
+    def set_clfs(self, clfs):
+        self.clfs = clfs
 
 
 class BootstrapThresholdCutoff(__ResamplingThresholdCutoffBase):
@@ -185,6 +209,12 @@ class NoSplitCutoff(Cutoff):
     def apply(self, X_test, inlier_rate):
         p_vals = self.__get_nosplit_p_values(X_test)
         return p_vals, self.apply_to_p_vals(p_vals)
+    
+    def get_clfs(self):
+        return [self.clf]
+    
+    def set_clfs(self, clfs):
+        self.clf = clfs[0]
 
 
 class MultisplitCutoff(Cutoff):
@@ -251,6 +281,12 @@ class MultisplitCutoff(Cutoff):
     def apply(self, X_test, inlier_rate):
         p_vals = self.__get_multisplit_p_values(X_test)
         return p_vals, self.apply_to_p_vals(p_vals)
+    
+    def get_clfs(self):
+        return self.clfs
+    
+    def set_clfs(self, clfs):
+        self.clfs = clfs
 
     def visualize_lottery(self, visualization_data, 
             test_case_name, clf_name, RESULTS_DIR, 
@@ -282,7 +318,7 @@ class MultisplitCutoff(Cutoff):
         mean_start = np.mean(p_vals_all.min(axis=0))
         mean_end = np.mean(p_vals_all.max(axis=0))
 
-        os.makedirs(os.path.join(RESULTS_DIR, 'img', test_case_name), exist_ok=True)
+        os.makedirs(os.path.join(RESULTS_DIR, test_case_name, 'img'), exist_ok=True)
 
         plt.figure(figsize=(16, 6))
         sns.set_theme()
@@ -329,7 +365,7 @@ class MultisplitCutoff(Cutoff):
             f' - max range length: {max_range:.3f}, mean: {mean_range:.3f}, median: {median_range:.3f}, range: ({mean_start:.3f}-{mean_end:.3f})')
 
         plt.savefig(
-            os.path.join(RESULTS_DIR, 'img', test_case_name, f'lottery-{clf_name}-{self.cutoff_type}.png'),
+            os.path.join(RESULTS_DIR, test_case_name, 'img', f'lottery-{clf_name}-{self.cutoff_type}.png'),
             dpi=300,
             bbox_inches='tight',
             facecolor='white',
@@ -357,7 +393,7 @@ class MultisplitCutoff(Cutoff):
             'Class': np.array(['Inlier'] * len(train_p_vals))
         })
 
-        os.makedirs(os.path.join(RESULTS_DIR, 'img', test_case_name), exist_ok=True)
+        os.makedirs(os.path.join(RESULTS_DIR, test_case_name, 'img'), exist_ok=True)
 
         # for metric in ['Score', 'p-value']:
         for metric in ['p-value']:
@@ -374,7 +410,7 @@ class MultisplitCutoff(Cutoff):
             
             plt.suptitle(f'{test_case_name} ({clf_name}, {self.cutoff_type}) - {metric} distribution')
             plt.savefig(
-                os.path.join(RESULTS_DIR, 'img', test_case_name, f'distribution-{metric}-{clf_name}-{self.cutoff_type}.png'),
+                os.path.join(RESULTS_DIR, test_case_name, 'img', f'distribution-{metric}-{clf_name}-{self.cutoff_type}.png'),
                 dpi=150,
                 bbox_inches='tight',
                 facecolor='white',
@@ -395,7 +431,7 @@ class MultisplitCutoff(Cutoff):
             'Class': np.where(inlier_mask, 'Inlier', 'Outlier'),
         })
 
-        os.makedirs(os.path.join(RESULTS_DIR, 'img', test_case_name), exist_ok=True)
+        os.makedirs(os.path.join(RESULTS_DIR, test_case_name, 'img'), exist_ok=True)
 
         # for metric in ['Score', 'p-value']:
         for metric in ['p-value']:
@@ -420,7 +456,7 @@ class MultisplitCutoff(Cutoff):
             plt.legend(loc="lower right")
 
             plt.savefig(
-                os.path.join(RESULTS_DIR, 'img', test_case_name, f'ROC-{metric}-{clf_name}-{self.cutoff_type}.png'),
+                os.path.join(RESULTS_DIR, test_case_name, 'img', f'ROC-{metric}-{clf_name}-{self.cutoff_type}.png'),
                 dpi=150,
                 bbox_inches='tight',
                 facecolor='white',
@@ -468,7 +504,7 @@ class MultisplitCutoff(Cutoff):
         mu_full = np.mean(X_train, axis=0).reshape(1, -1)
         sigma_full = np.cov(X_train.T)
 
-        os.makedirs(os.path.join(RESULTS_DIR, 'img', test_case_name), exist_ok=True)
+        os.makedirs(os.path.join(RESULTS_DIR, test_case_name, 'img'), exist_ok=True)
 
         vis_clf = self.construct_clf()
         self._clf_train(vis_clf, X_train, y_train)
@@ -514,7 +550,7 @@ class MultisplitCutoff(Cutoff):
 
         plt.tight_layout()
         plt.savefig(
-            os.path.join(RESULTS_DIR, 'img', test_case_name, f'diagnostic-scores-{clf_name}-{self.cutoff_type}.png'),
+            os.path.join(RESULTS_DIR, test_case_name, 'img', f'diagnostic-scores-{clf_name}-{self.cutoff_type}.png'),
             dpi=300,
             bbox_inches='tight',
             facecolor='white',
@@ -687,7 +723,7 @@ class PValueCutoff():
         if save_plot:
             fig.tight_layout()
             fig.savefig(
-                os.path.join(RESULTS_DIR, 'img', test_case_name, 
+                os.path.join(RESULTS_DIR, test_case_name, 'img', 
                     f'{self.short_cutoff_type}-{clf_name}-{self.base_cutoff.cutoff_type}.png'),
                 dpi=300,
                 bbox_inches='tight',
