@@ -21,21 +21,21 @@ class Cutoff():
     def cutoff_type(self):
         raise NotImplementedError('Use derived class for cutoff')
 
-    def _clf_train(self, clf, train_data):
-        return clf.fit(train_data)
+    def _clf_train(self, clf, X_train, y_train=None):
+        return clf.fit(X_train, y_train)
 
-    def _clf_predict(self, clf, test_data):
-        scores = clf.score_samples(test_data)
+    def _clf_predict(self, clf, X_test):
+        scores = clf.score_samples(X_test)
         return scores
 
-    def fit(self, X_train):
+    def fit(self, X_train, y_train=None):
         raise NotImplementedError('Use derived class for cutoff')
     
     def apply(self, X_test, inlier_rate):
         raise NotImplementedError('Use derived class for cutoff')
 
-    def fit_apply(self, X_train, X_test, inlier_rate):
-        self.fit(X_train)
+    def fit_apply(self, X_train, X_test, inlier_rate, y_train=None):
+        self.fit(X_train, y_train)
         return self.apply(X_test, inlier_rate)
 
 
@@ -45,8 +45,8 @@ class EmpiricalCutoff(Cutoff):
     def __init__(self, construct_clf):
         self.clf = construct_clf()
 
-    def fit(self, X_train):
-        self._clf_train(self.clf, X_train)
+    def fit(self, X_train, y_train=None):
+        self._clf_train(self.clf, X_train, y_train)
         self.is_fitted = True
 
     def apply(self, X_test, inlier_rate):
@@ -64,8 +64,8 @@ class ChiSquaredCutoff(Cutoff):
         # dim - number of features
         self.d = dim
 
-    def fit(self, X_train):
-        self._clf_train(self.clf, X_train)
+    def fit(self, X_train, y_train=None):
+        self._clf_train(self.clf, X_train, y_train)
         self.threshold_ = -scipy.stats.chi2.ppf(1 - self.inlier_rate, 2 * self.d)
         self.is_fitted = True
 
@@ -86,7 +86,7 @@ class __ResamplingThresholdCutoffBase(Cutoff):
     def _choose_samples(self, N):
         raise NotImplementedError('Use derived class for cutoff')
 
-    def __prepare_resampling_cal_scores(self, X_train):
+    def __prepare_resampling_cal_scores(self, X_train, y_train=None):
         N = len(X_train)
         cal_scores_all = []
 
@@ -94,9 +94,13 @@ class __ResamplingThresholdCutoffBase(Cutoff):
             resampling_samples = self._choose_samples(N)
             is_selected_sample = np.isin(range(N), resampling_samples)
             X_resampling_train, X_resampling_cal = X_train[is_selected_sample], X_train[~is_selected_sample]
-            
-            self._clf_train(self.clfs[i], X_resampling_train)
-            cal_scores = self._clf_predict(self.clfs[i], X_resampling_cal)
+            if y_train is not None:
+                y_resampling_train, y_resampling_cal = y_train[is_selected_sample], y_train[~is_selected_sample]
+            else:
+                y_resampling_train, y_resampling_cal = None, None
+
+            self._clf_train(self.clfs[i], X_resampling_train, y_resampling_train)
+            cal_scores = self._clf_predict(self.clfs[i], X_resampling_cal, y_resampling_cal)
             cal_scores_all.append(cal_scores)
         
         return cal_scores_all
@@ -117,8 +121,8 @@ class __ResamplingThresholdCutoffBase(Cutoff):
         resampling_threshold = np.mean(thresholds)
         return test_scores, resampling_threshold
 
-    def fit(self, X_train):
-        self.cal_scores_ = self.__prepare_resampling_cal_scores(X_train)
+    def fit(self, X_train, y_train=None):
+        self.cal_scores_ = self.__prepare_resampling_cal_scores(X_train, y_train)
         self.is_fitted = True
 
     def apply(self, X_test, inlier_rate):
@@ -153,8 +157,8 @@ class NoSplitCutoff(Cutoff):
         self.clf = construct_clf()
         self.alpha = alpha
 
-    def __prepare_nosplit_cal_scores(self, X_train):
-        self._clf_train(self.clf, X_train)
+    def __prepare_nosplit_cal_scores(self, X_train, y_train=None):
+        self._clf_train(self.clf, X_train, y_train)
         cal_scores = self._clf_predict(self.clf, X_train)
         return cal_scores
 
@@ -166,8 +170,8 @@ class NoSplitCutoff(Cutoff):
         p_vals = (num_smaller_cal_scores + 1) / (len(cal_scores) + 1)
         return p_vals
 
-    def fit(self, X_train):
-        self.cal_scores_ = self.__prepare_nosplit_cal_scores(X_train)
+    def fit(self, X_train, y_train=None):
+        self.cal_scores_ = self.__prepare_nosplit_cal_scores(X_train, y_train)
         self.is_fitted = True
         return self.cal_scores_
 
@@ -200,7 +204,7 @@ class MultisplitCutoff(Cutoff):
         self.resampling_repeats = resampling_repeats
         self.median_multiplier = median_multiplier
 
-    def __prepare_multisplit_cal_scores(self, X_train):
+    def __prepare_multisplit_cal_scores(self, X_train, y_train=None):
         N = len(X_train)
         cal_scores_all = np.zeros((self.resampling_repeats, N - int(N/2)))
 
@@ -208,8 +212,12 @@ class MultisplitCutoff(Cutoff):
             multisplit_samples = np.random.choice(range(N), size=int(N/2), replace=False)
             is_multisplit_sample = np.isin(range(N), multisplit_samples)
             X_multi_train, X_multi_cal = X_train[is_multisplit_sample], X_train[~is_multisplit_sample]
+            if y_train is not None:
+                y_multi_train, y_multi_cal = y_train[is_multisplit_sample], y_train[~is_multisplit_sample]
+            else:
+                y_multi_train, y_multi_cal = None, None
             
-            self._clf_train(self.clfs[i], X_multi_train)
+            self._clf_train(self.clfs[i], X_multi_train, y_multi_train)
             cal_scores = self._clf_predict(self.clfs[i], X_multi_cal)
             cal_scores_all[i, :] = cal_scores
         
@@ -228,8 +236,8 @@ class MultisplitCutoff(Cutoff):
         p_vals = self.median_multiplier * np.median(p_vals_all, axis=0)
         return p_vals
 
-    def fit(self, X_train):
-        self.cal_scores_ = self.__prepare_multisplit_cal_scores(X_train)
+    def fit(self, X_train, y_train=None):
+        self.cal_scores_ = self.__prepare_multisplit_cal_scores(X_train, y_train)
         self.is_fitted = True
         return self.cal_scores_
 
@@ -247,7 +255,7 @@ class MultisplitCutoff(Cutoff):
     def visualize_lottery(self, visualization_data, 
             test_case_name, clf_name, RESULTS_DIR, 
             max_samples=100):
-        X_train, X_test, y_test = visualization_data
+        X_train, y_train, X_test, y_test = visualization_data
 
         if len(X_test) > max_samples:
             # constant random state is important for consistency
@@ -282,7 +290,7 @@ class MultisplitCutoff(Cutoff):
         data = p_vals_all[:, :max_samples]
         df = pd.DataFrame({
             'p-value': data.reshape(-1),
-            'Split': np.repeat(range(1, 11), data.shape[1]),
+            'Split': np.repeat(range(1, self.resampling_repeats + 1), data.shape[1]),
             'Sample': np.tile(range(1, data.shape[1] + 1), data.shape[0]),
             'Type': np.tile(np.where(y_test[:data.shape[1]] == 1, 'Inlier', 'Outlier'), data.shape[0]),
         })
@@ -330,7 +338,7 @@ class MultisplitCutoff(Cutoff):
 
     def visualize_p_values(self, visualization_data,
             test_case_name, clf_name, RESULTS_DIR):
-        X_train, X_test, y_test = visualization_data
+        X_train, y_train, X_test, y_test = visualization_data
 
         p_vals = self.get_p_vals(X_test)
         train_p_vals = self.get_p_vals(X_train)
@@ -375,7 +383,7 @@ class MultisplitCutoff(Cutoff):
 
     def visualize_roc(self, visualization_data,
             test_case_name, clf_name, RESULTS_DIR):
-        X_train, X_test, y_test = visualization_data
+        X_train, y_train, X_test, y_test = visualization_data
         p_vals = self.get_p_vals(X_test)
         
         inlier_idx = np.where(y_test == 1)[0]
@@ -424,7 +432,7 @@ class MultisplitCutoff(Cutoff):
         for _ in range(self.resampling_repeats):
             vis_clfs.append(self.construct_clf())
 
-        X_train, X_test, y_test = visualization_data
+        X_train, y_train, X_test, y_test = visualization_data
         N = len(X_train)
 
         mu_multis = []
@@ -435,8 +443,12 @@ class MultisplitCutoff(Cutoff):
             multisplit_samples = np.random.choice(range(N), size=int(N/2), replace=False)
             is_multisplit_sample = np.isin(range(N), multisplit_samples)
             X_multi_train, X_multi_cal = X_train[is_multisplit_sample], X_train[~is_multisplit_sample]
+            if y_train is not None:
+                y_multi_train, y_multi_cal = y_train[is_multisplit_sample], y_train[~is_multisplit_sample]
+            else:
+                y_multi_train, y_multi_cal = None, None
             
-            self._clf_train(vis_clfs[i], X_multi_train)
+            self._clf_train(vis_clfs[i], X_multi_train, y_multi_train)
             train_scores = self._clf_predict(vis_clfs[i], X_train)
             # test_scores = self._clf_predict(vis_clfs[i], X_test)
 
@@ -459,7 +471,7 @@ class MultisplitCutoff(Cutoff):
         os.makedirs(os.path.join(RESULTS_DIR, 'img', test_case_name), exist_ok=True)
 
         vis_clf = self.construct_clf()
-        self._clf_train(vis_clf, X_train)
+        self._clf_train(vis_clf, X_train, y_train)
         train_scores = self._clf_predict(vis_clf, X_train)
         # test_scores = self._clf_predict(vis_clf, X_train)
 

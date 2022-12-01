@@ -35,6 +35,7 @@ def run_tests(metric_list, alpha_metrics, test_description, get_results_dir, bas
                 np.random.seed(exp)
                 # Load data
                 X_train_orig, X_test_orig, y_test_orig = get_dataset_function()
+                oracle_data = convert_occ_dataset_to_binary(X_train_orig, X_test_orig, y_test_orig)
                 inlier_rate = np.mean(y_test_orig)
 
                 if test_inliers_only:
@@ -48,6 +49,11 @@ def run_tests(metric_list, alpha_metrics, test_description, get_results_dir, bas
 
                         np.random.seed(exp)
                         X_train, X_test, y_test = apply_PCA_threshold(X_train_orig, X_test_orig, y_test_orig, pca_variance_threshold)
+                        if 'Oracle' in clf_name:
+                            X_train, y_train, X_test, y_test = oracle_data
+                        else:
+                            y_train = None
+
                         construct_clf = lambda clf_name=clf_name, exp=exp, RESULTS_DIR=RESULTS_DIR: \
                             get_occ_from_name(clf_name, random_state=exp, RESULTS_DIR=RESULTS_DIR)
 
@@ -64,9 +70,6 @@ def run_tests(metric_list, alpha_metrics, test_description, get_results_dir, bas
                             'special_visualization_params': {
                                 'exp': exp,
                                 'pca_variance_threshold': pca_variance_threshold,
-                                'X_train': X_train,
-                                'X_test': X_test,
-                                'y_test': y_test,
                             },
                         }
 
@@ -76,7 +79,8 @@ def run_tests(metric_list, alpha_metrics, test_description, get_results_dir, bas
 
                             np.random.seed(exp)
                             predictions = get_cutoff_predictions(cutoff, X_train, X_test, inlier_rate, 
-                                visualize_tests, apply_control_cutoffs, **extra_params)
+                                visualize_tests, apply_control_cutoffs, **extra_params,
+                                y_train=y_train, y_test=y_test)
 
                             for cutoff_name, scores, y_pred, elapsed in predictions:
                                 occ_metrics = {

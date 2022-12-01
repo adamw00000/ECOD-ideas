@@ -121,7 +121,7 @@ def geometric_median(X, eps=1e-5):
         y = y1
 
 class GeomMedianDistance():
-    def fit(self, X, eps=1e-5):
+    def fit(self, X, y=None, eps=1e-5):
         self.median = geometric_median(X, eps)
         return self
     
@@ -137,7 +137,7 @@ def dot_diag(A, B):
     return np.einsum('ij,ji->i', A, B)
 
 class Mahalanobis():
-    def fit(self, X):
+    def fit(self, X, y=None):
         self.mu = np.mean(X, axis=0).reshape(1, -1)
 
         if X.shape[1] != 1:
@@ -170,7 +170,7 @@ class PyODWrapper():
     def __init__(self, model):
         self.model = model
     
-    def fit(self, X_train):
+    def fit(self, X_train, y_train=None):
         self.model.fit(X_train)
         return self
 
@@ -188,12 +188,16 @@ from hbos import HBOS
 from pyod.models.cblof import CBLOF
 from A3_adapter import A3Adapter
 
+from sklearn.linear_model import LogisticRegression
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.tree import DecisionTreeClassifier
+
 class CBLOFWrapper():
     def __init__(self, model):
         assert isinstance(model, CBLOF)
         self.model = model
     
-    def fit(self, X_train):
+    def fit(self, X_train, y_train=None):
         is_fitted = False
         while not is_fitted:
             try:
@@ -210,28 +214,50 @@ class CBLOFWrapper():
     def score_samples(self, X):
         return -self.model.decision_function(X)
 
+class OracleWrapper():
+    def __init__(self, model):
+        self.model = model
+    
+    def fit(self, X_train, y_train):
+        self.model.fit(X_train, y_train)
+        return self
+
+    def score_samples(self, X):
+        return self.model.predict_proba(X)[:, 1]
+
 def get_occ_from_name(clf_name, random_state, RESULTS_DIR, contamination=0.001):
+    if 'Oracle' in clf_name:
+        if 'LR' in clf_name:
+            return OracleWrapper(LogisticRegression())
+        elif 'DT' in clf_name:
+            return OracleWrapper(DecisionTreeClassifier())
+        elif 'RF' in clf_name:
+            return OracleWrapper(RandomForestClassifier(n_jobs=3))
+        else:
+            raise NotImplementedError('Oracle method not implemented')
+
     if clf_name == 'ECOD':
-        clf = PyODWrapper(ECOD(contamination=contamination))
+        return PyODWrapper(ECOD(contamination=contamination))
     elif clf_name == 'ECODv2':
-        clf = PyODWrapper(ECODv2(contamination=contamination))
+        return PyODWrapper(ECODv2(contamination=contamination))
     elif clf_name == 'ECODv2Min':
-        clf = PyODWrapper(ECODv2Min(contamination=contamination))
+        return PyODWrapper(ECODv2Min(contamination=contamination))
     elif clf_name == 'HBOS':
-        clf = PyODWrapper(HBOS(n_bins='auto', contamination=contamination))
+        return PyODWrapper(HBOS(n_bins='auto', contamination=contamination))
     elif clf_name == 'CBLOF':
-        clf = CBLOFWrapper(CBLOF(contamination=contamination, random_state=random_state))
+        return CBLOFWrapper(CBLOF(contamination=contamination, random_state=random_state))
     elif clf_name == 'GeomMedian':
-        clf = GeomMedianDistance()
+        return GeomMedianDistance()
     elif clf_name == 'Mahalanobis':
-        clf = Mahalanobis()
+        return Mahalanobis()
     elif clf_name == 'OC-SVM':
-        clf = OneClassSVM(nu=contamination)
+        return OneClassSVM(nu=contamination)
     elif clf_name == 'IForest':
-        clf = IsolationForest(contamination=contamination, random_state=random_state)
+        return IsolationForest(contamination=contamination, random_state=random_state)
     elif clf_name == 'A^3':
-        clf = A3Adapter(max_target_epochs=200, max_a3_epochs=1000, patience=30, verbose=0, model_dir=RESULTS_DIR)
-    return clf
+        return A3Adapter(max_target_epochs=200, max_a3_epochs=1000, patience=30, verbose=0, model_dir=RESULTS_DIR)
+    else:
+        raise NotImplementedError('OCC method not implemented')
 
 # %%
 def filter_inliers(X_test, y_test):
@@ -352,31 +378,36 @@ def prepare_metrics(y_test, y_pred, scores, occ_metrics, metric_list, pos_class_
 import time
 from occ_cutoffs import *
 
-def get_cutoff_predictions(cutoff, X_train, X_test, inlier_rate, visualize_tests=False, apply_control_cutoffs=False,
-        control_cutoff_params=None, common_visualization_params=None, special_visualization_params=None):
+def get_cutoff_predictions(cutoff, X_train, X_test, inlier_rate,
+        visualize_tests=False, apply_control_cutoffs=False, control_cutoff_params=None,
+        common_visualization_params=None, special_visualization_params=None,
+        y_train=None, y_test=None):
     start_time = time.perf_counter()
-    scores, y_pred = cutoff.fit_apply(X_train, X_test, inlier_rate)
+    scores, y_pred = cutoff.fit_apply(X_train, X_test, inlier_rate, y_train=y_train)
     elapsed = time.perf_counter() - start_time
     yield cutoff.cutoff_type, scores, y_pred, elapsed
     
     alpha, inlier_rate = \
         control_cutoff_params['alpha'], control_cutoff_params['inlier_rate']
-    exp, pca_variance_threshold, X_train, X_test, y_test = \
+    exp, pca_variance_threshold = \
         special_visualization_params['exp'], \
-        special_visualization_params['pca_variance_threshold'], \
-        special_visualization_params['X_train'], \
-        special_visualization_params['X_test'], \
-        special_visualization_params['y_test']
+        special_visualization_params['pca_variance_threshold']
+
+    if not (isinstance(cutoff, MultisplitCutoff) \
+            or isinstance(cutoff, NoSplitCutoff)):
+        return
 
     # Multisplit only
-    if isinstance(cutoff, MultisplitCutoff):
-        visualize = (visualize_tests and exp == 0 and pca_variance_threshold is None)
-        if visualize:
-            visualize_multisplit(cutoff, (X_train, X_test, y_test), \
-                common_visualization_params)
-            
-            # Set up plots for later
-            plot_infos = prepare_cutoff_plots(cutoff, **common_visualization_params)
+    visualize = (visualize_tests and exp == 0 and pca_variance_threshold is None \
+        and isinstance(cutoff, MultisplitCutoff))
+    if visualize:
+        visualize_multisplit(cutoff, (X_train, y_train, X_test, y_test), \
+            common_visualization_params)
+        
+        # Set up plots for later
+        if apply_control_cutoffs:
+            if cutoff.resampling_repeats != 1:
+                plot_infos = prepare_cutoff_plots(cutoff, **common_visualization_params)
 
     if not apply_control_cutoffs:
         return
@@ -385,7 +416,7 @@ def get_cutoff_predictions(cutoff, X_train, X_test, inlier_rate, visualize_tests
         BenjaminiHochbergCutoff(cutoff, alpha, None),
         BenjaminiHochbergCutoff(cutoff, alpha, inlier_rate),
         FORControlCutoff(cutoff, alpha, inlier_rate),
-        FNRControlCutoff(cutoff, alpha, inlier_rate),
+        # FNRControlCutoff(cutoff, alpha, inlier_rate),
         # CombinedFORFNRControlCutoff(cutoff, alpha, inlier_rate),
     ]):
         start_time = time.perf_counter()
@@ -394,19 +425,23 @@ def get_cutoff_predictions(cutoff, X_train, X_test, inlier_rate, visualize_tests
         yield control_cutoff.full_cutoff_type, scores, y_pred, elapsed
 
         if visualize:
-            draw_cutoff_plots(control_cutoff, X_test, y_test, \
-                common_visualization_params, plot_infos[cutoff_num])
+            if cutoff.resampling_repeats != 1:
+                draw_cutoff_plots(control_cutoff, X_test, y_test, \
+                    common_visualization_params, plot_infos[cutoff_num])
 
 def visualize_multisplit(cutoff, visualization_data, 
         common_visualization_params):
-    cutoff.visualize_calibration(visualization_data, 
-            **common_visualization_params)
     cutoff.visualize_lottery(visualization_data, 
             **common_visualization_params,
             max_samples=100)
+
+    if cutoff.resampling_repeats == 1:
+        return
+
+    cutoff.visualize_calibration(visualization_data, 
+            **common_visualization_params)
     cutoff.visualize_roc(visualization_data,
             **common_visualization_params)
-
     cutoff.visualize_p_values(visualization_data,
             **common_visualization_params)
 
@@ -420,19 +455,19 @@ def prepare_cutoff_plots(cutoff, test_case_name, clf_name, RESULTS_DIR):
     for_fig, for_axs = plt.subplots(1, 2, figsize=(24, 8))
     for_fig.suptitle(title)
 
-    fnr_fig, fnr_axs = plt.subplots(1, 2, figsize=(24, 8))
-    fnr_fig.suptitle(title)
+    # fnr_fig, fnr_axs = plt.subplots(1, 2, figsize=(24, 8))
+    # fnr_fig.suptitle(title)
 
-    for_fnr_fig, for_fnr_axs = plt.subplots(1, 2, figsize=(24, 8))
-    for_fnr_fig.suptitle(title)
+    # for_fnr_fig, for_fnr_axs = plt.subplots(1, 2, figsize=(24, 8))
+    # for_fnr_fig.suptitle(title)
 
     plot_info = [
         # ((fig, axs), save_plot)
         ((bh_fig, bh_axs[0, :]), False), 
         ((bh_fig, bh_axs[1, :]), True),
         ((for_fig, for_axs), True),
-        ((fnr_fig, fnr_axs), True),
-        ((for_fnr_fig, for_fnr_axs), True),
+        # ((fnr_fig, fnr_axs), True),
+        # ((for_fnr_fig, for_fnr_axs), True),
     ]
     
     return plot_info
@@ -522,3 +557,23 @@ def aggregate_results(df, metric_list, alpha_metrics, RESULTS_DIR, DATASET_TYPE,
                 .to_csv(os.path.join(RESULTS_DIR, f'{DATASET_TYPE}-all-{metric}-alpha-transposed.csv'))
 
 # %%
+def convert_occ_dataset_to_binary(X_train_occ, X_test_occ, y_test_occ, train_outlier_portion=0.6):
+    outlier_idx = np.where(y_test_occ == 0)[0]
+
+    num_training_outliers = int(train_outlier_portion * len(outlier_idx))
+    train_outlier_idx = np.random.choice(outlier_idx, size=num_training_outliers, replace=False)
+    train_outlier_mask = np.where(np.isin(range(len(y_test_occ)), train_outlier_idx), True, False)
+
+    X_train = np.concatenate([
+        X_train_occ,
+        X_test_occ[train_outlier_mask],
+    ])
+    y_train = np.concatenate([
+        np.ones(len(X_train_occ)),
+        np.zeros(len(train_outlier_idx)),
+    ])
+
+    X_test = X_test_occ[~train_outlier_mask]
+    y_test = y_test_occ[~train_outlier_mask]
+
+    return X_train, y_train, X_test, y_test
