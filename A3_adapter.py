@@ -39,71 +39,87 @@ class A3Adapter():
         model_vae.fit(train_target[0], epochs=0, batch_size=256)
 
         if TRAIN_TARGET:
-            with CustomNamedTemporaryFile(prefix='A3_target_', suffix='.hdf5', delete=True) as tmp:
-                MODEL_TARGET_PATH = tmp.name
-                # MODEL_TARGET_PATH = os.path.join(self.model_dir, 'best_model.hdf5')
-
-                mc_callback = tf.keras.callbacks.ModelCheckpoint(MODEL_TARGET_PATH, monitor='val_loss',mode='min', save_best_only=True)
-                es_callback = tf.keras.callbacks.EarlyStopping(monitor='val_loss', mode='min', patience=self.patience)
-
-                # Create target network
-                model_target = dense_ae(input_shape=X_train.shape[1:], layer_dims=[1000, 500, 200, 75])
-                # model_target.compile(optimizer='adam', loss='binary_crossentropy')
-                model_target.compile(optimizer='adam', loss='mse')
-                history_target = model_target.fit(
-                    train_target[0], train_target[1],
-                    validation_data=val_target,
-                    epochs=self.target_epochs, batch_size=256, 
-                    callbacks=[
-                        es_callback, 
-                        # mc_callback,
-                    ],
-                    verbose=self.verbose,
-                )
-                epochs_target = len(history_target.history['loss'])
-
-                # model_target.load_weights(MODEL_TARGET_PATH)
-                # os.remove(MODEL_TARGET_PATH)
-
-            # Create alarm and overall network
-            model_a3 = A3(target_network=model_target)
-            model_a3.add_anomaly_network(random_noise)
-            model_alarm = alarm_net(
-                layer_dims=[1000, 500, 200, 75],
-                input_shape=model_a3.get_alarm_shape(),
-            )
-            model_a3.add_alarm_network(model_alarm)
-
-        with CustomNamedTemporaryFile(prefix='A3_a3_', suffix='.hdf5', delete=True) as tmp:
-            MODEL_A3_PATH = tmp.name
-            # MODEL_A3_PATH = os.path.join(self.model_dir, 'best_model.hdf5')
-            mc_callback = tf.keras.callbacks.ModelCheckpoint(MODEL_A3_PATH, monitor='val_loss',mode='min', save_best_only=True)
+            mc_callback = SaveBestModelMemory(monitor='val_loss', mode='min')
             es_callback = tf.keras.callbacks.EarlyStopping(monitor='val_loss', mode='min', patience=self.patience)
 
-            model_a3.compile(
-                optimizer=tf.keras.optimizers.Adam(.00001),
-                loss="binary_crossentropy",
-            )
-            history_a3 = model_a3.fit(
-                train_alarm[0],
-                train_alarm[1],
-                validation_data=val_alarm,
-                epochs=self.a3_epochs, batch_size=256, 
+            # Create target network
+            model_target = dense_ae(input_shape=X_train.shape[1:], layer_dims=[1000, 500, 200, 75])
+            # model_target.compile(optimizer='adam', loss='binary_crossentropy')
+            model_target.compile(optimizer='adam', loss='mse')
+            history_target = model_target.fit(
+                train_target[0], train_target[1],
+                validation_data=val_target,
+                epochs=self.target_epochs, batch_size=256, 
                 callbacks=[
                     es_callback, 
-                    # mc_callback,
+                    mc_callback,
                 ],
                 verbose=self.verbose,
             )
-            epochs_a3 = len(history_a3.history['loss'])
+            epochs_target = len(history_target.history['loss'])
+            model_target.set_weights(mc_callback.best_weights)
 
-            # model_a3.load_weights(MODEL_A3_PATH)
-            # os.remove(MODEL_A3_PATH)
+        # Create alarm and overall network
+        model_a3 = A3(target_network=model_target)
+        model_a3.add_anomaly_network(random_noise)
+        model_alarm = alarm_net(
+            layer_dims=[1000, 500, 200, 75],
+            input_shape=model_a3.get_alarm_shape(),
+        )
+        model_a3.add_alarm_network(model_alarm)
 
+        mc_callback_a3 = SaveBestModelMemory(monitor='val_loss', mode='min', a3_model=model_a3)
+        es_callback_a3 = tf.keras.callbacks.EarlyStopping(monitor='val_loss', mode='min', patience=self.patience)
+
+        model_a3.compile(
+            optimizer=tf.keras.optimizers.Adam(.00001),
+            loss="binary_crossentropy",
+        )
+        history_a3 = model_a3.fit(
+            train_alarm[0],
+            train_alarm[1],
+            validation_data=val_alarm,
+            epochs=self.a3_epochs, batch_size=256, 
+            callbacks=[
+                es_callback_a3, 
+                mc_callback_a3,
+            ],
+            verbose=self.verbose,
+        )
+        epochs_a3 = len(history_a3.history['loss'])
+        model_a3.set_weights(mc_callback_a3.best_weights)
         self.model = model_a3
     
     def score_samples(self, samples):
         return 1 - self.model.predict(samples).reshape(-1)
+
+
+class SaveBestModelMemory(tf.keras.callbacks.Callback):
+    def __init__(self, monitor='val_loss', mode='min', a3_model=None):
+        self.monitor = monitor
+        self.mode = mode
+        self.a3_model = a3_model
+        if mode == 'min':
+            self.best = float('inf')
+        else:
+            self.best = float('-inf')
+
+    def on_epoch_end(self, epoch, logs=None):
+        metric_value = logs[self.monitor]
+        if self.mode == 'min':
+            if metric_value < self.best:
+                self.best = metric_value
+                if self.a3_model is None:
+                    self.best_weights = self.model.get_weights()
+                else:
+                    self.best_weights = self.a3_model.get_weights()
+        else:
+            if metric_value > self.best:
+                self.best = metric_value
+                if self.a3_model is None:
+                    self.best_weights = self.model.get_weights()
+                else:
+                    self.best_weights = self.a3_model.get_weights()
 
 
 class CustomNamedTemporaryFile:

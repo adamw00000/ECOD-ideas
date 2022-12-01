@@ -335,3 +335,40 @@ class A3:
             )
         except AttributeError:
             self.overall_model = None
+
+    def get_weights(self):
+        target_weights = self.target_network.get_weights()
+        if self.anomaly_network:
+            anomaly_weights = None
+            try:
+                anomaly_weights = self.anomaly_network.get_weights()
+            except AttributeError:
+                print("Cannot save the anomaly network. May be ignored if it is only a layer.")
+        alarm_weights = self.alarm_network.get_weights()
+
+        # There is a bug in TF<2.2 which causes the save operation to fail for .h5 files
+        # Dirty hack: append random number to all layers
+        # https://github.com/tensorflow/tensorflow/issues/32672
+        for cur_layer in self.overall_model.layers:
+            cur_layer._name = f'{cur_layer.name}_rand{random.randint(10, 100)}'
+
+        overall_weights = self.overall_model.get_weights()
+
+        return {
+            'Target': target_weights,
+            'Anomaly': anomaly_weights,
+            'Alarm': alarm_weights,
+            'Overall': overall_weights,
+        }
+
+    def set_weights(self, weights):
+        target_weights, anomaly_weights, alarm_weights, overall_weights = \
+            weights['Target'], weights['Anomaly'], weights['Alarm'], weights['Overall']
+
+        self.target_network.set_weights(target_weights)
+        if self.anomaly_network:
+            if anomaly_weights is not None:
+                anomaly_weights = self.anomaly_network.set_weights(anomaly_weights)
+        self.alarm_network.set_weights(alarm_weights)
+
+        self.overall_model.set_weights(overall_weights)
