@@ -2,7 +2,7 @@
 import os
 import pandas as pd
 import numpy as np
-from occ_all_tests_common import *
+from occ_all_tests_lib import *
 
 
 for dir in os.listdir('.'):

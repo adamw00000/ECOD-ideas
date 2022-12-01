@@ -2,7 +2,7 @@
 import os
 import numpy as np
 import pandas as pd
-from occ_all_tests_common import *
+from occ_all_tests_lib import *
 
 test_type = 'fdr'
 DATASET_TYPE = 'BINARYdata'

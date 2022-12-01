@@ -1,5 +1,5 @@
 # %%
-from occ_all_tests_common import *
+from occ_all_tests_lib import *
 from occ_test_base_t1e import run_type_I_error_tests
 import occ_datasets
 

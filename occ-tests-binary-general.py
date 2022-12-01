@@ -1,5 +1,5 @@
 # %%
-from occ_all_tests_common import *
+from occ_all_tests_lib import *
 from occ_test_base_general import run_general_tests
 import binary_datasets
 

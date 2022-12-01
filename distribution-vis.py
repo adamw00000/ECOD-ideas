@@ -1,6 +1,6 @@
 # %%
 import os
-from occ_all_tests_common import *
+from occ_all_tests_lib import *
 import numpy as np
 import matplotlib.pyplot as plt
 
