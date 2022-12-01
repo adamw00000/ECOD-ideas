@@ -359,9 +359,6 @@ def get_cutoff_predictions(cutoff, X_train, X_test, inlier_rate, visualize_tests
     elapsed = time.perf_counter() - start_time
     yield cutoff.cutoff_type, scores, y_pred, elapsed
     
-    if not isinstance(cutoff, MultisplitCutoff):
-        return
-    
     alpha, inlier_rate = \
         control_cutoff_params['alpha'], control_cutoff_params['inlier_rate']
     exp, pca_variance_threshold, X_train, X_test, y_test = \
@@ -372,13 +369,14 @@ def get_cutoff_predictions(cutoff, X_train, X_test, inlier_rate, visualize_tests
         special_visualization_params['y_test']
 
     # Multisplit only
-    visualize = (visualize_tests and exp == 0 and pca_variance_threshold is None)
-    if visualize:
-        visualize_multisplit(cutoff, (X_train, X_test, y_test), \
-            common_visualization_params)
-        
-        # Set up plots for later
-        plot_infos = prepare_cutoff_plots(cutoff, **common_visualization_params)
+    if isinstance(cutoff, MultisplitCutoff):
+        visualize = (visualize_tests and exp == 0 and pca_variance_threshold is None)
+        if visualize:
+            visualize_multisplit(cutoff, (X_train, X_test, y_test), \
+                common_visualization_params)
+            
+            # Set up plots for later
+            plot_infos = prepare_cutoff_plots(cutoff, **common_visualization_params)
 
     if not apply_control_cutoffs:
         return
@@ -388,7 +386,7 @@ def get_cutoff_predictions(cutoff, X_train, X_test, inlier_rate, visualize_tests
         BenjaminiHochbergCutoff(cutoff, alpha, inlier_rate),
         FORControlCutoff(cutoff, alpha, inlier_rate),
         FNRControlCutoff(cutoff, alpha, inlier_rate),
-        CombinedFORFNRControlCutoff(cutoff, alpha, inlier_rate),
+        # CombinedFORFNRControlCutoff(cutoff, alpha, inlier_rate),
     ]):
         start_time = time.perf_counter()
         scores, y_pred = control_cutoff.fit_apply(X_test)
