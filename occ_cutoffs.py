@@ -221,7 +221,7 @@ class MultisplitCutoff(Cutoff):
             cal_scores = self.cal_scores_[i, :]
             test_scores = self._clf_predict(self.clfs[i], X_test)
 
-            num_smaller_cal_scores = (test_scores > cal_scores.reshape(-1, 1)).sum(axis=0)
+            num_smaller_cal_scores = (test_scores >= cal_scores.reshape(-1, 1)).sum(axis=0)
             p_vals = (num_smaller_cal_scores + 1) / (len(cal_scores) + 1)
             p_vals_all[i, :] = p_vals
 
