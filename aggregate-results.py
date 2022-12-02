@@ -6,9 +6,9 @@ from occ_all_tests_lib import *
 
 test_type = 'fdr'
 DATASET_TYPE = 'BINARYdata'
-alpha = 0.05
+alpha = 0.1
 
-DIR = os.path.join('results-partial', f'results_{DATASET_TYPE}_{test_type}_{alpha}')
+DIR = os.path.join('results', f'results_{DATASET_TYPE}_{test_type}_{alpha:.2f}')
 
 df = pd.DataFrame()
 for file in os.listdir(os.path.join(DIR)):

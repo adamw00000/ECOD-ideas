@@ -353,57 +353,50 @@ def apply_multisplit_to_baseline(baseline):
 from sklearn import metrics
 
 def get_metrics(y_true, y_pred, scores, pos_class_only=False, \
-        default_pre=0, default_rec=0, default_f1=0, \
-        default_fdr=np.nan, default_fnr=np.nan, default_for=np.nan):
-    false_detections = np.sum((y_pred == 0) & (y_true == 1))
-    detections = np.sum(y_pred == 0)
-    if detections != 0:
-        fdr = false_detections / detections
-    else:
-        # fdr = np.nan
-        fdr = default_fdr
-
-    if not pos_class_only:
-        auc = metrics.roc_auc_score(y_true, scores)
-    else:
-        auc = np.nan
+        default_pre=np.nan, default_rec=np.nan, default_f1=np.nan, \
+        default_fdr=np.nan, default_fnr=np.nan, default_for=np.nan,
+        default_t1e=np.nan):
+    AUC = metrics.roc_auc_score(y_true, scores) if not pos_class_only else np.nan
     
-    acc = metrics.accuracy_score(y_true, y_pred)
-    pre = metrics.precision_score(y_true, y_pred, zero_division=default_pre)
-    rec = metrics.recall_score(y_true, y_pred, zero_division=default_rec)
-    f1 = metrics.f1_score(y_true, y_pred, zero_division=default_f1)
+    # positives == "outliers" in this case
+    PP = np.sum(y_pred == 0) # predicted outliers (rejected samples)
+    P  = np.sum(y_true == 0) # true outliers
+    PN = np.sum(y_pred == 1) # predicted inliers (not rejected samples)
+    N  = np.sum(y_true == 1) # true inliers
 
-    inlier_idx = np.where(y_true == 1)[0]
-    t1e = 1 - np.mean(y_pred[inlier_idx] == y_true[inlier_idx])
+    TP = np.sum((y_true == 0) & (y_pred == 0)) # correctly classified outliers
+    FP = np.sum((y_true == 1) & (y_pred == 0)) # rejected inliers (incorrectly)
+    TN = np.sum((y_true == 1) & (y_pred == 1)) # correctly classified inliers
+    FN = np.sum((y_true == 0) & (y_pred == 1)) # not rejected outliers (incorrectly)
 
-    # important for PU
-    false_rejections = np.sum((y_pred == 1) & (y_true == 0)) # False rejections == negative samples predicted to be positive
-    rejections = np.sum(y_pred == 1) # All rejections == samples predicted to be positive
-    if rejections != 0:
-        false_omission_rate = false_rejections / rejections
-    else:
-        # false_omission_rate = np.nan
-        false_omission_rate = default_for
+    T1E = FP / N  if N  != 0 else default_t1e
+    FDR = FP / PP if PP != 0 else default_fdr
+    FOR = FN / PN if PN != 0 else default_for
+    FNR = FN / P  if P  != 0 else default_fnr
 
-    if np.sum(y_true == 0) != 0:
-        fnr = false_rejections / np.sum(y_true == 0)
-    else:
-        # fnr = np.nan
-        fnr = default_fnr
+    ACC = (TP + TN) / (P + N)
+
+    PRE = TN / PN if PN != 0 else default_pre
+    REC = TN / N  if N  != 0 else default_rec
+    F1 = (2 * PRE * REC) / (PRE + REC) \
+        if (PRE != 0 or REC != 0) and (not np.isnan(PRE) and not np.isnan(REC)) \
+        else default_f1
 
     return {
-        'AUC': auc,
-        'ACC': acc,
-        'PRE': pre,
-        'REC': rec,
-        'F1': f1,
-        'FDR': fdr,
-        'FOR': false_omission_rate,
-        'FNR': fnr,
-        'T1E': t1e, # Type I Error
+        'AUC': AUC,
+        'ACC': ACC,
+        'PRE': PRE,
+        'REC': REC,
+        'F1':  F1,
+        'FDR': FDR, # False Discovery Rate
+        'FOR': FOR, # False Omission Rate
+        'FNR': FNR, # False Negative Rate
+        'T1E': T1E, # Type I Error
 
-        '#FD': false_detections,
-        '#D': detections,
+        'TP': TP,
+        'FP': FP,
+        'TN': TN,
+        'FN': FN,
     }
 
 def prepare_metrics(y_test, y_pred, scores, occ_metrics, metric_list, pos_class_only=False):
@@ -563,6 +556,7 @@ default_metric_values = {
     'FDR': 0,
     'FOR': 0,
     'FNR': 0,
+    'T1E': 0,
 }
 def fill_nan_values(df, default_values=default_metric_values):
     for metric, default in default_values.items():
