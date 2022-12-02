@@ -40,8 +40,8 @@ def run_tests(metric_list, alpha_metrics, test_description, get_results_dir, bas
                 inlier_rate = np.mean(y_test_orig)
 
                 exp_dir = os.path.join(RESULTS_DIR, test_case_name, 'experiments', str(exp))
-                save_experiment_data(exp_dir, 
-                    X_train_orig, X_test_orig, y_test_orig, oracle_data)
+                # save_experiment_data(exp_dir, 
+                #     X_train_orig, X_test_orig, y_test_orig, oracle_data)
 
                 if test_inliers_only:
                     # include only inliers

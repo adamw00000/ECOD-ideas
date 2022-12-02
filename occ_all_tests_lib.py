@@ -429,7 +429,7 @@ def get_cutoff_predictions(cutoff, X_train, X_test, inlier_rate,
     elapsed = time.perf_counter() - start_time
     yield cutoff.cutoff_type, scores, y_pred, elapsed
 
-    serialize_clfs(cutoff, exp_dir, clf_name)
+    # serialize_clfs(cutoff, exp_dir, clf_name)
     
     alpha, inlier_rate = \
         control_cutoff_params['alpha'], control_cutoff_params['inlier_rate']
