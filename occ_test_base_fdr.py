@@ -6,7 +6,7 @@ from typing import List
 metric_list = ['AUC', 
     'ACC', 'PRE', 'REC', 'F1', 
     'T1E', 'FOR', 'FNR', 'FDR',
-    'TP', 'FP', 'TN', 'FN',
+    '#', '#TP', '#FP', '#TN', '#FN', 
     'Time']
 alpha_metrics = ['FDR', 'FOR', 'FNR']
 

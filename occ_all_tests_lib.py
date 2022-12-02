@@ -393,10 +393,10 @@ def get_metrics(y_true, y_pred, scores, pos_class_only=False, \
         'FNR': FNR, # False Negative Rate
         'T1E': T1E, # Type I Error
 
-        'TP': TP,
-        'FP': FP,
-        'TN': TN,
-        'FN': FN,
+        '#TP': TP,
+        '#FP': FP,
+        '#TN': TN,
+        '#FN': FN,
     }
 
 def prepare_metrics(y_test, y_pred, scores, occ_metrics, metric_list, pos_class_only=False):
