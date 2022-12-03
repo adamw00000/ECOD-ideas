@@ -436,15 +436,14 @@ def get_cutoff_predictions(cutoff, X_train, X_test, inlier_rate,
 
     # Multisplit only
     visualize = (visualize_tests and exp == 0 and pca_variance_threshold is None \
-        and isinstance(cutoff, MultisplitCutoff))
+        and isinstance(cutoff, MultisplitCutoff) and cutoff.resampling_repeats != 1)
     if visualize:
         visualize_multisplit(cutoff, (X_train, y_train, X_test, y_test), \
             common_visualization_params)
         
         # Set up plots for later
         if apply_control_cutoffs:
-            if cutoff.resampling_repeats != 1:
-                plot_infos = prepare_cutoff_plots(cutoff, **common_visualization_params)
+            plot_infos = prepare_cutoff_plots(cutoff, **common_visualization_params)
 
     if not apply_control_cutoffs:
         return
@@ -462,19 +461,14 @@ def get_cutoff_predictions(cutoff, X_train, X_test, inlier_rate,
         yield control_cutoff.full_cutoff_type, scores, y_pred, elapsed
 
         if visualize:
-            if cutoff.resampling_repeats != 1:
-                draw_cutoff_plots(control_cutoff, X_test, y_test, \
-                    common_visualization_params, plot_infos[cutoff_num])
+            draw_cutoff_plots(control_cutoff, X_test, y_test, \
+                common_visualization_params, plot_infos[cutoff_num])
 
 def visualize_multisplit(cutoff, visualization_data, 
         common_visualization_params):
     cutoff.visualize_lottery(visualization_data, 
             **common_visualization_params,
             max_samples=100)
-
-    if cutoff.resampling_repeats == 1:
-        return
-
     cutoff.visualize_calibration(visualization_data, 
             **common_visualization_params)
     cutoff.visualize_roc(visualization_data,
