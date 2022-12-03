@@ -232,7 +232,7 @@ def get_occ_from_name(clf_name, random_state, RESULTS_DIR, contamination=0.001):
         elif 'DT' in clf_name:
             return OracleWrapper(DecisionTreeClassifier())
         elif 'RF' in clf_name:
-            return OracleWrapper(RandomForestClassifier(n_jobs=3))
+            return OracleWrapper(RandomForestClassifier())
         else:
             raise NotImplementedError('Oracle method not implemented')
 
