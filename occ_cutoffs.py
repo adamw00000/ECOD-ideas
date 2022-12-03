@@ -391,6 +391,11 @@ class MultisplitCutoff(Cutoff):
             bbox_inches='tight',
             facecolor='white',
         )
+        plt.savefig(
+            os.path.join(RESULTS_DIR, test_case_name, 'img', f'lottery-{clf_name}-{self.cutoff_type}.pdf'),
+            bbox_inches='tight',
+            facecolor='white',
+        )
         plt.close(fig)
 
     def visualize_p_values(self, visualization_data,
@@ -433,6 +438,11 @@ class MultisplitCutoff(Cutoff):
             plt.savefig(
                 os.path.join(RESULTS_DIR, test_case_name, 'img', f'distribution-{metric}-{clf_name}-{self.cutoff_type}.png'),
                 dpi=150,
+                bbox_inches='tight',
+                facecolor='white',
+            )
+            plt.savefig(
+                os.path.join(RESULTS_DIR, test_case_name, 'img', f'distribution-{metric}-{clf_name}-{self.cutoff_type}.pdf'),
                 bbox_inches='tight',
                 facecolor='white',
             )
@@ -479,6 +489,11 @@ class MultisplitCutoff(Cutoff):
             plt.savefig(
                 os.path.join(RESULTS_DIR, test_case_name, 'img', f'ROC-{metric}-{clf_name}-{self.cutoff_type}.png'),
                 dpi=150,
+                bbox_inches='tight',
+                facecolor='white',
+            )
+            plt.savefig(
+                os.path.join(RESULTS_DIR, test_case_name, 'img', f'ROC-{metric}-{clf_name}-{self.cutoff_type}.pdf'),
                 bbox_inches='tight',
                 facecolor='white',
             )
@@ -573,6 +588,11 @@ class MultisplitCutoff(Cutoff):
         plt.savefig(
             os.path.join(RESULTS_DIR, test_case_name, 'img', f'diagnostic-scores-{clf_name}-{self.cutoff_type}.png'),
             dpi=300,
+            bbox_inches='tight',
+            facecolor='white',
+        )
+        plt.savefig(
+            os.path.join(RESULTS_DIR, test_case_name, 'img', f'diagnostic-scores-{clf_name}-{self.cutoff_type}.pdf'),
             bbox_inches='tight',
             facecolor='white',
         )
@@ -738,7 +758,6 @@ class PValueCutoff():
                 h._sizes = [4.]
 
         ax.set_title(f'{self.cutoff_type}, alpha={self.alpha:.3f}' + \
-            f', alpha={self.alpha:.3f}' + \
             f'{f" (zoomed)" if zoom else ""}')
 
         if save_plot:
@@ -747,6 +766,13 @@ class PValueCutoff():
                 os.path.join(RESULTS_DIR, test_case_name, 'img', 
                     f'{self.short_cutoff_type}-{clf_name}-{self.base_cutoff.cutoff_type}.png'),
                 dpi=300,
+                bbox_inches='tight',
+                facecolor='white',
+            )
+            fig.savefig(
+                os.path.join(RESULTS_DIR, test_case_name, 'img', 
+                    f'{self.short_cutoff_type}-{clf_name}-{self.base_cutoff.cutoff_type}.pdf'),
+                # dpi=300,
                 bbox_inches='tight',
                 facecolor='white',
             )

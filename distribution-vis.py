@@ -17,6 +17,7 @@ plt.plot(auto_reg_test[:, 0], auto_reg_test[:, 1], '.')
 plt.title('Autoregressive dataset')
 plt.legend(['Train', 'Test'])
 plt.savefig(os.path.join('plots', 'autoregressive.png'), dpi=300)
+plt.savefig(os.path.join('plots', 'autoregressive.pdf'))
 
 # %%
 plt.figure(figsize=(8, 6))
@@ -26,6 +27,7 @@ plt.plot(multinomial_test[:, 0], multinomial_test[:, 1], '.')
 plt.title('Multinomial dataset')
 plt.legend(['Train', 'Test'])
 plt.savefig(os.path.join('plots', 'multinomial.png'), dpi=300)
+plt.savefig(os.path.join('plots', 'multinomial.pdf'))
 
 # %%
 plt.figure(figsize=(8, 6))
@@ -35,5 +37,6 @@ plt.plot(normal_test[:, 0], normal_test[:, 1], '.')
 plt.title('Normal dataset')
 plt.legend(['Train', 'Test'])
 plt.savefig(os.path.join('plots', 'normal.png'), dpi=300)
+plt.savefig(os.path.join('plots', 'normal.pdf'))
 
 # %%
