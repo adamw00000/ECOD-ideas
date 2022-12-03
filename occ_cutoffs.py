@@ -111,11 +111,15 @@ class __ResamplingThresholdCutoffBase(Cutoff):
         for i in range(self.resampling_repeats):
             resampling_samples = self._choose_samples(N)
             is_selected_sample = np.isin(range(N), resampling_samples)
-            X_resampling_train, X_resampling_cal = X_train[is_selected_sample], X_train[~is_selected_sample]
             if y_train is not None:
+                for sample_class in [0, 1]:
+                    if np.sum(y_train[is_selected_sample] == sample_class) == 0: # no sample of one class
+                        first_class_sample = np.where(y_train == sample_class)[0][0]
+                        is_selected_sample[first_class_sample] = True # to avoid no positive/negative samples
                 y_resampling_train, y_resampling_cal = y_train[is_selected_sample], y_train[~is_selected_sample]
             else:
                 y_resampling_train, y_resampling_cal = None, None
+            X_resampling_train, X_resampling_cal = X_train[is_selected_sample], X_train[~is_selected_sample]
 
             self._clf_train(self.clfs[i], X_resampling_train, y_resampling_train)
             cal_scores = self._clf_predict(self.clfs[i], X_resampling_cal, y_resampling_cal)
@@ -241,11 +245,15 @@ class MultisplitCutoff(Cutoff):
         for i in range(self.resampling_repeats):
             multisplit_samples = np.random.choice(range(N), size=int(N/2), replace=False)
             is_multisplit_sample = np.isin(range(N), multisplit_samples)
-            X_multi_train, X_multi_cal = X_train[is_multisplit_sample], X_train[~is_multisplit_sample]
             if y_train is not None:
+                for sample_class in [0, 1]:
+                    if np.sum(y_train[is_multisplit_sample] == sample_class) == 0: # no sample of one class
+                        first_class_sample = np.where(y_train == sample_class)[0][0]
+                        is_multisplit_sample[first_class_sample] = True # to avoid no positive/negative samples
                 y_multi_train, y_multi_cal = y_train[is_multisplit_sample], y_train[~is_multisplit_sample]
             else:
                 y_multi_train, y_multi_cal = None, None
+            X_multi_train, X_multi_cal = X_train[is_multisplit_sample], X_train[~is_multisplit_sample]
             
             self._clf_train(self.clfs[i], X_multi_train, y_multi_train)
             cal_scores = self._clf_predict(self.clfs[i], X_multi_cal)
@@ -514,12 +522,16 @@ class MultisplitCutoff(Cutoff):
         for i in range(self.resampling_repeats):
             multisplit_samples = np.random.choice(range(N), size=int(N/2), replace=False)
             is_multisplit_sample = np.isin(range(N), multisplit_samples)
-            X_multi_train, X_multi_cal = X_train[is_multisplit_sample], X_train[~is_multisplit_sample]
             if y_train is not None:
+                for sample_class in [0, 1]:
+                    if np.sum(y_train[is_multisplit_sample] == sample_class) == 0: # no sample of one class
+                        first_class_sample = np.where(y_train == sample_class)[0][0]
+                        is_multisplit_sample[first_class_sample] = True # to avoid no positive/negative samples
                 y_multi_train, y_multi_cal = y_train[is_multisplit_sample], y_train[~is_multisplit_sample]
             else:
                 y_multi_train, y_multi_cal = None, None
-            
+            X_multi_train, X_multi_cal = X_train[is_multisplit_sample], X_train[~is_multisplit_sample]
+
             self._clf_train(vis_clfs[i], X_multi_train, y_multi_train)
             train_scores = self._clf_predict(vis_clfs[i], X_train)
             # test_scores = self._clf_predict(vis_clfs[i], X_test)
