@@ -8,3 +8,4 @@ occ-data/
 *.h5
 *.joblib
 *.npy
+*.tar.gz

@@ -439,7 +439,7 @@ def get_cutoff_predictions(cutoff, X_train, X_test, inlier_rate,
         and isinstance(cutoff, MultisplitCutoff) and cutoff.resampling_repeats != 1)
     if visualize:
         visualize_multisplit(cutoff, (X_train, y_train, X_test, y_test), \
-            common_visualization_params)
+            alpha, common_visualization_params)
         
         # Set up plots for later
         if apply_control_cutoffs:
@@ -465,9 +465,10 @@ def get_cutoff_predictions(cutoff, X_train, X_test, inlier_rate,
                 common_visualization_params, plot_infos[cutoff_num])
 
 def visualize_multisplit(cutoff, visualization_data, 
-        common_visualization_params):
+        alpha, common_visualization_params):
     cutoff.visualize_lottery(visualization_data, 
             **common_visualization_params,
+            alpha=alpha,
             max_samples=100)
     cutoff.visualize_calibration(visualization_data, 
             **common_visualization_params)
