@@ -23,7 +23,7 @@ def get_all_distribution_configs():
     
     return all_configs
 
-for alpha in [0.05, 0.25]:
+for alpha in [0.1, 0.25]:
     run_type_I_error_tests(DATASET_TYPE, get_all_distribution_configs, alpha=alpha)
 
 # %%
