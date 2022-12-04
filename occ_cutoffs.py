@@ -240,7 +240,7 @@ class MultisplitCutoff(Cutoff):
 
     def __prepare_multisplit_cal_scores(self, X_train, y_train=None):
         N = len(X_train)
-        cal_scores_all = np.zeros((self.resampling_repeats, N - int(N/2)))
+        cal_scores_all = []
 
         for i in range(self.resampling_repeats):
             multisplit_samples = np.random.choice(range(N), size=int(N/2), replace=False)
@@ -257,14 +257,14 @@ class MultisplitCutoff(Cutoff):
             
             self._clf_train(self.clfs[i], X_multi_train, y_multi_train)
             cal_scores = self._clf_predict(self.clfs[i], X_multi_cal)
-            cal_scores_all[i, :] = cal_scores
+            cal_scores_all.append(cal_scores)
         
         return cal_scores_all
 
     def __get_multisplit_p_values(self, X_test):
         p_vals_all = np.zeros((self.resampling_repeats, len(X_test)))
         for i in range(self.resampling_repeats):
-            cal_scores = self.cal_scores_[i, :]
+            cal_scores = self.cal_scores_[i]
             test_scores = self._clf_predict(self.clfs[i], X_test)
 
             num_smaller_cal_scores = (test_scores >= cal_scores.reshape(-1, 1)).sum(axis=0)
@@ -311,7 +311,7 @@ class MultisplitCutoff(Cutoff):
 
         p_vals_all = np.zeros((self.resampling_repeats, len(X_test)))
         for i in range(self.resampling_repeats):
-            cal_scores = self.cal_scores_[i, :]
+            cal_scores = self.cal_scores_[i]
             test_scores = self._clf_predict(self.clfs[i], X_test)
 
             num_smaller_cal_scores = (test_scores > cal_scores.reshape(-1, 1)).sum(axis=0)
@@ -515,8 +515,6 @@ class MultisplitCutoff(Cutoff):
         X_train, y_train, X_test, y_test = visualization_data
         N = len(X_train)
 
-        mu_multis = []
-        sigma_multis = []
         train_df = pd.DataFrame()
 
         for i in range(self.resampling_repeats):
@@ -534,41 +532,24 @@ class MultisplitCutoff(Cutoff):
 
             self._clf_train(vis_clfs[i], X_multi_train, y_multi_train)
             train_scores = self._clf_predict(vis_clfs[i], X_train)
-            # test_scores = self._clf_predict(vis_clfs[i], X_test)
 
             train_df = pd.concat([train_df, pd.DataFrame({
                 'Split': np.char.add('Split ', np.repeat(i + 1, len(X_train)).astype(str)),
                 'Score': train_scores,
                 'SampleType': np.where(is_multisplit_sample, 'Train', 'Calibration'),
             })])
-            # train_df = pd.concat([train_df, pd.DataFrame({
-            #     'Split': np.char.add('Split ', np.repeat(i + 1, len(X_train)).astype(str)),
-            #     'Score': test_scores,
-            #     'SampleType': 'Test',
-            # })])
-            mu_multis.append(np.mean(X_multi_train, axis=0).reshape(1, -1))
-            sigma_multis.append(np.cov(X_multi_train.T))
-
-        mu_full = np.mean(X_train, axis=0).reshape(1, -1)
-        sigma_full = np.cov(X_train.T)
 
         os.makedirs(os.path.join(RESULTS_DIR, test_case_name, 'img'), exist_ok=True)
 
         vis_clf = self.construct_clf()
         self._clf_train(vis_clf, X_train, y_train)
         train_scores = self._clf_predict(vis_clf, X_train)
-        # test_scores = self._clf_predict(vis_clf, X_train)
 
         train_df = pd.concat([train_df, pd.DataFrame({
             'Split': 'Train',
             'Score': train_scores,
             'SampleType': 'Train',
         })])
-        # train_df = pd.concat([train_df, pd.DataFrame({
-        #     'Split': 'Whole train',
-        #     'Score': test_scores,
-        #     'SampleType': 'Test',
-        # })])
         train_df = train_df.reset_index(drop=True)
         cal_df = train_df[(train_df.SampleType == 'Calibration') | (train_df.Split == 'Train')]
 
