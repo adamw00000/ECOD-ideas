@@ -472,16 +472,17 @@ def get_cutoff_predictions(cutoff, X_train, X_test, inlier_rate,
 
 def visualize_multisplit(cutoff, visualization_data, 
         alpha, common_visualization_params):
-    cutoff.visualize_lottery(visualization_data, 
-            **common_visualization_params,
-            alpha=alpha,
-            max_samples=100)
-    cutoff.visualize_calibration(visualization_data, 
-            **common_visualization_params)
-    cutoff.visualize_roc(visualization_data,
-            **common_visualization_params)
-    cutoff.visualize_p_values(visualization_data,
-            **common_visualization_params)
+    if alpha != 0.25:
+        cutoff.visualize_lottery(visualization_data, 
+                **common_visualization_params,
+                alpha=alpha,
+                max_samples=100)
+        cutoff.visualize_calibration(visualization_data, 
+                **common_visualization_params)
+        cutoff.visualize_roc(visualization_data,
+                **common_visualization_params)
+        cutoff.visualize_p_values(visualization_data,
+                **common_visualization_params)
 
 def prepare_cutoff_plots(cutoff, test_case_name, clf_name, RESULTS_DIR):
     sns.set_theme()
