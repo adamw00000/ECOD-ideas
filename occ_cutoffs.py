@@ -228,7 +228,7 @@ class MultisplitCutoff(Cutoff):
             + (f'-{self.median_multiplier}_median' if self.median_multiplier != 1 else '') \
             + (f'-{self.resampling_repeats}_repeat' if self.resampling_repeats != 10 else '')
 
-    def __init__(self, construct_clf, alpha, resampling_repeats, median_multiplier=2):
+    def __init__(self, construct_clf, alpha, resampling_repeats, median_multiplier=1):
         self.construct_clf = construct_clf
         self.clfs = []
         for _ in range(resampling_repeats):
@@ -635,7 +635,7 @@ class PValueCutoff():
         return p_vals, y_pred
 
     def apply_to_pvals(self, p_vals):
-        y_pred = np.where(p_vals < self.threshold_, 0, 1)
+        y_pred = np.where(p_vals <= self.threshold_, 0, 1)
         return y_pred
 
     def _get_thresholds(self, N):
@@ -754,17 +754,19 @@ class PValueCutoff():
             f'{f" (zoomed)" if zoom else ""}')
 
         if save_plot:
+            os.makedirs(os.path.join(RESULTS_DIR, test_case_name, 'img'), exist_ok=True)
             fig.tight_layout()
+            base_cutoff_string = "-" + self.base_cutoff.cutoff_type if self.base_cutoff.cutoff_type != "Multisplit" else ""
             fig.savefig(
                 os.path.join(RESULTS_DIR, test_case_name, 'img', 
-                    f'{self.short_cutoff_type}-{clf_name}-{self.base_cutoff.cutoff_type}.png'),
+                    f'cutoff-{clf_name}{base_cutoff_string}-{self.short_cutoff_type}.png'),
                 dpi=300,
                 bbox_inches='tight',
                 facecolor='white',
             )
             fig.savefig(
                 os.path.join(RESULTS_DIR, test_case_name, 'img', 
-                    f'{self.short_cutoff_type}-{clf_name}-{self.base_cutoff.cutoff_type}.pdf'),
+                    f'cutoff-{clf_name}{base_cutoff_string}-{self.short_cutoff_type}.pdf'),
                 # dpi=300,
                 bbox_inches='tight',
                 facecolor='white',
@@ -772,14 +774,14 @@ class PValueCutoff():
             plt.close(fig)
 
 
-class FORControlCutoff(PValueCutoff):
+class FORControlCutoffOld(PValueCutoff):
     @property
     def cutoff_type(self):
-        return 'FOR-CTL'
+        return 'FOR-CTL-old'
 
     @property
     def short_cutoff_type(self):
-        return 'FOR-CTL'
+        return 'FOR-CTL-old'
 
     def __init__(self, base_cutoff, alpha, pi):
         super().__init__(base_cutoff)
@@ -787,17 +789,120 @@ class FORControlCutoff(PValueCutoff):
         self.pi = pi
 
     def _get_thresholds(self, N):
-        i_array = np.array(range(N))
+        i_array = np.array(range(N)) + 1 # 1, ..., N
         return [1 - ((1 - (i_array / N)) * (1 - self.alpha)) / (self.pi)]
 
     def _get_threshold_names(self):
-        return ['FOR threshold']
-    
+        return ['Old FOR threshold']
+
     def _calculate_final_threshold(self, sorted_p_vals, minimal_thresholds):
-        p_vals_below_bar = np.where(sorted_p_vals < minimal_thresholds)[0]
+        # min p(i): p(i) <= threshold
+        p_vals_below_bar = np.where(sorted_p_vals <= minimal_thresholds)[0]
         if len(p_vals_below_bar) > 0:
             first_fulfillment_index = p_vals_below_bar[0]
             return sorted_p_vals[first_fulfillment_index]
+        else:
+            return np.inf
+
+    def apply_to_pvals(self, p_vals):
+        y_pred = np.where(p_vals < self.threshold_, 0, 1)
+        return y_pred
+
+
+class FORControlCutoffGreaterEqual(PValueCutoff):
+    @property
+    def cutoff_type(self):
+        return 'FOR-CTL-geq'
+
+    @property
+    def short_cutoff_type(self):
+        return 'FOR-CTL-geq'
+
+    def __init__(self, base_cutoff, alpha, pi):
+        super().__init__(base_cutoff)
+        self.alpha = alpha
+        self.pi = pi
+
+    def _get_thresholds(self, N):
+        i_array = np.array(range(N)) + 1 # 1, ..., N
+        return [1 - ((1 - (i_array / N)) * (1 - self.alpha)) / (self.pi)]
+
+    def _get_threshold_names(self):
+        return ['FOR threshold (geq ver.)']
+
+    def _calculate_final_threshold(self, sorted_p_vals, minimal_thresholds):
+        # max p(i): p(i) >= threshold
+        p_vals_below_bar = np.where(sorted_p_vals >= minimal_thresholds)[0]
+        if len(p_vals_below_bar) > 0:
+            last_fulfillment_index = p_vals_below_bar[-1]
+            return sorted_p_vals[last_fulfillment_index]
+        else:
+            return np.inf
+
+
+class FORControlCutoffGreaterEqualAcceptEqual(PValueCutoff):
+    @property
+    def cutoff_type(self):
+        return 'FOR-CTL-geq-accept-eq'
+
+    @property
+    def short_cutoff_type(self):
+        return 'FOR-CTL-geq-accept-eq'
+
+    def __init__(self, base_cutoff, alpha, pi):
+        super().__init__(base_cutoff)
+        self.alpha = alpha
+        self.pi = pi
+
+    def _get_thresholds(self, N):
+        i_array = np.array(range(N)) + 1 # 1, ..., N
+        return [1 - ((1 - (i_array / N)) * (1 - self.alpha)) / (self.pi)]
+
+    def _get_threshold_names(self):
+        return ['FOR threshold (geq, accept equal ver.)']
+
+    def _calculate_final_threshold(self, sorted_p_vals, minimal_thresholds):
+        # max p(i): p(i) >= threshold
+        p_vals_below_bar = np.where(sorted_p_vals >= minimal_thresholds)[0]
+        if len(p_vals_below_bar) > 0:
+            last_fulfillment_index = p_vals_below_bar[-1]
+            return sorted_p_vals[last_fulfillment_index]
+        else:
+            return np.inf
+
+    def apply_to_pvals(self, p_vals):
+        # Accept equal pvals
+        y_pred = np.where(p_vals < self.threshold_, 0, 1)
+        return y_pred
+
+
+class FORControlCutoffGreaterThan(PValueCutoff):
+    @property
+    def cutoff_type(self):
+        return 'FOR-CTL-gt'
+
+    @property
+    def short_cutoff_type(self):
+        return 'FOR-CTL-gt'
+
+    def __init__(self, base_cutoff, alpha, pi):
+        super().__init__(base_cutoff)
+        self.alpha = alpha
+        self.pi = pi
+
+    def _get_thresholds(self, N):
+        i_array = np.array(range(N)) + 1 # 1, ..., N
+        return [1 - ((1 - (i_array / N)) * (1 - self.alpha)) / (self.pi)]
+
+    def _get_threshold_names(self):
+        return ['FOR threshold (gt ver.)']
+
+    def _calculate_final_threshold(self, sorted_p_vals, minimal_thresholds):
+        # max p(i): p(i) > threshold
+        p_vals_below_bar = np.where(sorted_p_vals > minimal_thresholds)[0]
+        if len(p_vals_below_bar) > 0:
+            last_fulfillment_index = p_vals_below_bar[-1]
+            return sorted_p_vals[last_fulfillment_index]
         else:
             return np.inf
 
@@ -817,7 +922,7 @@ class FNRControlCutoff(PValueCutoff):
         self.pi = pi
 
     def _get_thresholds(self, N):
-        i_array = np.array(range(N))
+        i_array = np.array(range(N)) + 1 # 1, ..., N
         return [1 - ((1 - (i_array / N)) - self.alpha) / (self.pi)]
 
     def _get_threshold_names(self):
@@ -847,7 +952,7 @@ class CombinedFORFNRControlCutoff(PValueCutoff):
         self.pi = pi
 
     def _get_thresholds(self, N):
-        i_array = np.array(range(N))
+        i_array = np.array(range(N)) + 1 # 1, ..., N
         return [
             1 - ((1 - (i_array / N)) * (1 - self.alpha)) / (self.pi), # FOR
             1 - ((1 - (i_array / N) - self.alpha)) / (self.pi), # FNR
@@ -869,7 +974,7 @@ class BenjaminiHochbergCutoff(PValueCutoff):
     @property
     def cutoff_type(self):
         return 'BH' \
-            + (f'+pi' if self.pi is not None!= 1 else '')
+            + (f'+pi' if self.pi is not None else '')
 
     @property
     def short_cutoff_type(self):
@@ -885,14 +990,15 @@ class BenjaminiHochbergCutoff(PValueCutoff):
             self.alpha = alpha / self.pi
 
     def _get_thresholds(self, N):
-        i_array = np.array(range(N))
+        i_array = np.array(range(N)) + 1 # 1, ..., N
         return [(i_array / N) * self.alpha]
 
     def _get_threshold_names(self):
         return ['BH threshold']
 
     def _calculate_final_threshold(self, sorted_p_vals, minimal_thresholds):
-        p_vals_below_bar = np.where(sorted_p_vals < minimal_thresholds)[0]
+        # max p(i): p(i) <= threshold
+        p_vals_below_bar = np.where(sorted_p_vals <= minimal_thresholds)[0]
         if len(p_vals_below_bar) > 0:
             last_fulfillment_index = p_vals_below_bar[-1]
             return sorted_p_vals[last_fulfillment_index]
