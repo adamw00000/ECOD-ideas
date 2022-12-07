@@ -767,7 +767,6 @@ class PValueCutoff():
             fig.savefig(
                 os.path.join(RESULTS_DIR, test_case_name, 'img', 
                     f'cutoff-{clf_name}{base_cutoff_string}-{self.short_cutoff_type}.pdf'),
-                # dpi=300,
                 bbox_inches='tight',
                 facecolor='white',
             )

@@ -397,6 +397,9 @@ def get_metrics(y_true, y_pred, scores, pos_class_only=False, \
         '#FP': FP,
         '#TN': TN,
         '#FN': FN,
+
+        'NoRejected': PN == 0,
+        'NoAccepted': PP == 0,
     }
 
 def prepare_metrics(y_test, y_pred, scores, occ_metrics, metric_list, pos_class_only=False):
