@@ -6,7 +6,9 @@ from occ_all_tests_lib import *
 
 test_type = 'fdr'
 DATASET_TYPE = 'BINARYdata'
+# DATASET_TYPE = 'SIMPLEtest'
 alpha = 0.1
+# alpha = 0.25
 
 DIR = os.path.join('results', f'results_{DATASET_TYPE}_{test_type}_{alpha:.2f}')
 
