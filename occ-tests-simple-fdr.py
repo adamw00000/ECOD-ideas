@@ -9,12 +9,12 @@ def sample_normal_simple(n, theta=2, inlier_rate=0.6):
     n_outliers = n - n_inliers
 
     # X_train = np.random.multivariate_normal(np.zeros(2), np.eye(2), n)
-    X_train = np.random.multivariate_normal([0], [1], n)
+    X_train = np.random.normal(0, 1, n).reshape(-1, 1)
     X_test = np.concatenate([
         # np.random.multivariate_normal([0, 0], np.eye(2), n_inliers),
         # np.random.multivariate_normal([diff, 0], np.eye(2), n_outliers),
-        np.random.multivariate_normal([0], [1], n_inliers),
-        np.random.multivariate_normal([theta], [1], n_outliers)
+        np.random.normal(0, 1, n_inliers).reshape(-1, 1),
+        np.random.normal(theta, 1, n_outliers).reshape(-1, 1)
     ])
     y_test = np.concatenate([np.ones(n_inliers), np.zeros(n_outliers)])
     return X_train, X_test, y_test
