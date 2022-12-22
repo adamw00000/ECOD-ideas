@@ -569,6 +569,7 @@ default_metric_values = {
     'F1': 0,
     'FDR': 0,
     'FOR': 0,
+    'BFOR': 0,
     'FNR': 0,
     'T1E': 0,
 }
@@ -577,13 +578,11 @@ def fill_nan_values(df, default_values=default_metric_values):
         if metric not in df.columns:
             continue
 
-        df[metric].fillna(default)
+        df[metric] = df[metric].fillna(default)
 
     return df
 
 # %%
-from occ_all_tests_lib import *
-
 def aggregate_results(df, metric_list, alpha_metrics, RESULTS_DIR, DATASET_TYPE, alpha):
     for metric in metric_list:
         metric_df = df
