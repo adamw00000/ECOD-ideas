@@ -10,30 +10,35 @@ DATASET_TYPE = 'BINARYdata'
 alpha = 0.1
 # alpha = 0.25
 
-DIR = os.path.join('results', f'results_{DATASET_TYPE}_{test_type}_{alpha:.2f}')
+RESULTS_ROOT = os.path.join(
+    'results'
+)
 
-df = pd.DataFrame()
-for file in os.listdir(os.path.join(DIR)):
-    if 'all' in file \
-            or not file.endswith('.csv'):
+for results_dir in os.listdir(RESULTS_ROOT):
+    if not results_dir.startswith('results_'):
         continue
 
-    df = pd.concat([
-        df,
-        pd.read_csv(os.path.join(DIR, file))
-    ])
+    # f'results_{DATASET_TYPE}_{test_type}_{alpha:.2f}'
+    results_info = results_dir.split('_')
+    DATASET_TYPE = results_info[1]
+    test_type = results_info[2]
+    alpha = results_info[3]
+    DATASET_TYPE = results_info[1]
 
-df = df.reset_index(drop=True)
-df = df[df.Dataset != 'Mean']
-df[metrics_to_multiply_by_100] = df[metrics_to_multiply_by_100] / 100
+    raw_results_file = None
+    for file in os.listdir(os.path.join(RESULTS_ROOT, results_dir)):
+        if 'raw-results' in file:
+            raw_results_file = file
+            break
 
-metric_list = df.columns[3:]
-alpha_metrics = [m for m in metric_list if 'alpha' in m]
-metric_list = [m for m in metric_list if 'alpha' not in m]
+    df = pd.read_csv(os.path.join(RESULTS_ROOT, results_dir, raw_results_file))
+    
+    metric_list = df.columns[4:]
+    alpha_metrics = [m for m in metric_list if 'alpha' in m]
+    metric_list = [m for m in metric_list if 'alpha' not in m]
 
-df
-
-# %%
-aggregate_results(df, metric_list, alpha_metrics, DIR, DATASET_TYPE, alpha)
+    df = fill_nan_values(df)
+    DIR = os.path.join(RESULTS_ROOT, results_dir)
+    aggregate_results(df, metric_list, alpha_metrics, DIR, DATASET_TYPE, alpha)
 
 # %%
