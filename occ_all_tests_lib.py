@@ -625,11 +625,17 @@ def process_pivot(metric, pivot, alpha_metrics, RESULTS_DIR, DATASET_TYPE, alpha
         .to_csv(os.path.join(RESULTS_DIR, f'{DATASET_TYPE}-all-{metric}-transposed.csv'))
 
     if metric in alpha_metrics:
-        append_mean_row(pivot < alpha) \
+        append_mean_row(pivot <= alpha) \
             .to_csv(os.path.join(RESULTS_DIR, f'{DATASET_TYPE}-all-{metric}-alpha.csv'))
-        append_mean_row(pivot < alpha) \
+        append_mean_row(pivot <= alpha) \
             .transpose() \
             .to_csv(os.path.join(RESULTS_DIR, f'{DATASET_TYPE}-all-{metric}-alpha-transposed.csv'))
+        # 2 * alpha threshold
+        append_mean_row(pivot <= 2 * alpha) \
+            .to_csv(os.path.join(RESULTS_DIR, f'{DATASET_TYPE}-all-{metric}-2-alpha.csv'))
+        append_mean_row(pivot <= 2 * alpha) \
+            .transpose() \
+            .to_csv(os.path.join(RESULTS_DIR, f'{DATASET_TYPE}-all-{metric}-2-alpha-transposed.csv'))
 
 # %%
 def convert_occ_dataset_to_binary(X_train_occ, X_test_occ, y_test_occ, train_outlier_portion=0.6):

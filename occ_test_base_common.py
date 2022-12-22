@@ -120,7 +120,8 @@ def run_tests(metric_list, alpha_metrics, test_description, get_results_dir, bas
                 extra_mean_alpha_metrics.append('BFOR')
 
         for alpha_metric in alpha_metrics + extra_mean_alpha_metrics:
-            res_df[f'{alpha_metric} < alpha'] = res_df[alpha_metric] < alpha
+            res_df[f'{alpha_metric} < alpha'] = res_df[alpha_metric] <= alpha
+            res_df[f'{alpha_metric} < 2*alpha'] = res_df[alpha_metric] <= 2 * alpha
 
         for metric in metric_list + extra_mean_metrics:
             res_df[metric] = round_and_multiply_metric(res_df[metric], metric)
