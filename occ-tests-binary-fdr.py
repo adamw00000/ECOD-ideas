@@ -6,16 +6,16 @@ import binary_datasets
 DATASET_TYPE = 'BINARYdata'
 
 datasets = binary_datasets.full_dataset_list
-# datasets = [
-#     # ('Abalone', 'csv'),
-#     # ('Arrhythmia', 'csv'),
-#     # ('Tic-tac-toe', 'csv'),
-#     # ('Dermatology', 'csv'),
-#     # ('Madelon', 'csv'),
-#     # ('Banknote-authentication', 'csv'),
-#     # ('Isolet', 'csv'),
-#     # ('Fertility', 'csv'),
-# ]
+datasets = [
+    # ('Abalone', 'csv'),
+    # ('Arrhythmia', 'csv'),
+    # ('Tic-tac-toe', 'csv'),
+    # ('Dermatology', 'csv'),
+    # ('Madelon', 'csv'),
+    # ('Banknote-authentication', 'csv'),
+    # ('Isolet', 'csv'),
+    # ('Fertility', 'csv'),
+]
 
 def get_all_dataset_configs(train_ratio=0.6):
     all_configs = []
@@ -32,7 +32,8 @@ def get_all_dataset_configs(train_ratio=0.6):
     
     return all_configs
 
-for alpha in [0.1, 0.25]:
+# for alpha in [0.1, 0.25]:
+for alpha in [0.1]:
     run_fdr_tests(DATASET_TYPE, get_all_dataset_configs, alpha=alpha)
 
 # %%
