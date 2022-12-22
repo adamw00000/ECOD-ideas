@@ -109,10 +109,20 @@ def run_tests(metric_list, alpha_metrics, test_description, get_results_dir, bas
         res_df = dataset_df.groupby(['Dataset', 'Method', 'Cutoff'])\
             [metric_list] \
             .mean()
-        for alpha_metric in alpha_metrics:
+
+        extra_mean_metrics = []
+        extra_mean_alpha_metrics = []
+        # BFOR is special - in is calculated based on the means
+        if 'FOR' in metric_list and '#TN' in metric_list and '#FN' in metric_list:
+            res_df['BFOR'] = res_df['#FN'] / (res_df['#TN'] + res_df['#FN'])
+            extra_mean_metrics.append('BFOR')
+            if 'FOR' in alpha_metrics:
+                extra_mean_alpha_metrics.append('BFOR')
+
+        for alpha_metric in alpha_metrics + extra_mean_alpha_metrics:
             res_df[f'{alpha_metric} < alpha'] = res_df[alpha_metric] < alpha
 
-        for metric in metric_list:
+        for metric in metric_list + extra_mean_metrics:
             res_df[metric] = round_and_multiply_metric(res_df[metric], metric)
 
         res_df = append_mean_row(res_df)

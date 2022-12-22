@@ -584,28 +584,52 @@ def fill_nan_values(df, default_values=default_metric_values):
 
 # %%
 def aggregate_results(df, metric_list, alpha_metrics, RESULTS_DIR, DATASET_TYPE, alpha):
+    pivot_dict = {}
     for metric in metric_list:
         metric_df = df
         
         pivot = metric_df \
             .pivot_table(values=metric, index=['Dataset'], columns=['Method', 'Cutoff'], dropna=False)
+        
+        pivot_dict[metric] = pivot
+        process_pivot(metric, pivot, alpha_metrics, RESULTS_DIR, DATASET_TYPE, alpha)
+    
+    # BFOR is special - it operates on means instead of specific values
+    if 'FOR' in metric_list and '#FN' in metric_list and '#TN' in metric_list:
+        metric = 'BFOR'
+        if metric not in metric_list:
+            metric_list.append('metric')
 
-        pivot = pivot.dropna(how='all')
-        pivot = append_mean_row(pivot)
-        pivot = round_and_multiply_metric(pivot, metric)
+        tn = pivot_dict['#TN']
+        fn = pivot_dict['#FN']
 
-        pivot \
-            .to_csv(os.path.join(RESULTS_DIR, f'{DATASET_TYPE}-all-{metric}.csv'))
-        pivot \
+        BFOR_pivot = fn / (tn + fn)
+        BFOR_pivot = BFOR_pivot.fillna(default_metric_values[metric])
+        pivot_dict[metric] = BFOR_pivot
+
+        if 'FOR' in alpha_metrics:
+            alpha_metrics.append('BFOR')
+
+        process_pivot(metric, BFOR_pivot, alpha_metrics, RESULTS_DIR, DATASET_TYPE, alpha)
+
+
+def process_pivot(metric, pivot, alpha_metrics, RESULTS_DIR, DATASET_TYPE, alpha):
+    pivot = pivot.dropna(how='all')
+    pivot = append_mean_row(pivot)
+    pivot = round_and_multiply_metric(pivot, metric)
+
+    pivot \
+        .to_csv(os.path.join(RESULTS_DIR, f'{DATASET_TYPE}-all-{metric}.csv'))
+    pivot \
+        .transpose() \
+        .to_csv(os.path.join(RESULTS_DIR, f'{DATASET_TYPE}-all-{metric}-transposed.csv'))
+
+    if metric in alpha_metrics:
+        append_mean_row(pivot < alpha) \
+            .to_csv(os.path.join(RESULTS_DIR, f'{DATASET_TYPE}-all-{metric}-alpha.csv'))
+        append_mean_row(pivot < alpha) \
             .transpose() \
-            .to_csv(os.path.join(RESULTS_DIR, f'{DATASET_TYPE}-all-{metric}-transposed.csv'))
-
-        if metric in alpha_metrics:
-            append_mean_row(pivot < alpha) \
-                .to_csv(os.path.join(RESULTS_DIR, f'{DATASET_TYPE}-all-{metric}-alpha.csv'))
-            append_mean_row(pivot < alpha) \
-                .transpose() \
-                .to_csv(os.path.join(RESULTS_DIR, f'{DATASET_TYPE}-all-{metric}-alpha-transposed.csv'))
+            .to_csv(os.path.join(RESULTS_DIR, f'{DATASET_TYPE}-all-{metric}-alpha-transposed.csv'))
 
 # %%
 def convert_occ_dataset_to_binary(X_train_occ, X_test_occ, y_test_occ, train_outlier_portion=0.6):
