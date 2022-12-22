@@ -4,11 +4,13 @@ from occ_cutoffs import *
 import scipy.stats
 import scipy.optimize
 
+import matplotlib.pyplot as plt
+import seaborn as sns
 
-alpha = 0.05
+# alpha = 0.05
 
 # theta = 0
-pi = 0.1
+# pi = 0.5
 
 def F(q):
     score = scipy.stats.norm.ppf(q)
@@ -23,74 +25,52 @@ def F(q):
 def left(u):
     return (pi * u) / (pi * u + (1 - pi) * F(u))
 
-def right():
-    return alpha
-
-def fun(u):
-    return np.abs(left(u) - right())
+def fun(u, threshold):
+    return np.abs(left(u) - threshold)
 
 def for_fun(u):
     return ((1 - pi) * (1 - F(u))) / (pi * (1 - u) + (1 - pi) * (1 - F(u)))
 
-thetas = []
-us = []
-fdrs = []
-fors = []
+alpha = 0.05
 
-for theta in np.linspace(0, 100, 100):
-    res = scipy.optimize.differential_evolution(fun, bounds=[(0, 1)])
-    u = res.x
+for threshold in ['BH', 'BH+pi']:
+    sns.set_theme()
+    plt.figure(figsize=(10, 8))
 
-    FDR = left(u)
+    for pi in np.linspace(0, 1, 11):
+        thetas = []
+        us = []
+        fdrs = []
+        fors = []
+        for theta in np.linspace(0, 5, 21):
+            if threshold == 'BH':
+                threshold_value = alpha * pi
+            elif threshold == 'BH+pi':
+                threshold_value = alpha
 
-    thetas.append(theta)
-    us.append(u)
-    fdrs.append(FDR)
-    fors.append(for_fun(u))
+            res = scipy.optimize.differential_evolution(fun, 
+                bounds=[(0, 1)], tol=5e-4, args=(threshold_value,)
+            )
+            u = res.x
 
-import matplotlib.pyplot as plt
-import seaborn as sns
+            FDR = left(u)
 
-sns.set_theme()
+            thetas.append(theta)
+            us.append(u)
+            fdrs.append(FDR)
+            fors.append(for_fun(u).item())
 
-plt.figure(figsize=(8, 6))
-plt.plot(thetas, fors)
-plt.plot(thetas, us)
-plt.title(f'$\\pi$ = {pi}')
+        sns.lineplot(x=thetas, y=fors, label=f'$\\pi = {pi:.1f}$')
 
-plt.show()
+    plt.xlabel('Distance between means $\\theta$')
+    plt.ylabel('Expected FOR')
 
-# import matplotlib.pyplot as plt
-# import seaborn as sns
-
-# sns.set_theme()
-
-# pi = 0.6
-# theta = 2
-
-# plt.figure(figsize=(8, 6))
-# x = np.linspace(0, 1, int(1e5) + 1)
-# line = sns.lineplot(x=x, y=left(x))
-# line.axhline(y = right(), xmin=0, xmax=1, c='r')
-# plt.ylabel("Value")
-# plt.xlabel("$u^*$")
-# plt.legend(['Left side:$\\frac{\\pi u^*}{\\pi u^* + (1 - \\pi)F(u^*)}$', 'Right side: $\\pi \\alpha$'])
-# plt.title(f'$\\theta$ = {theta}, $\\pi$ = {pi}, $\\alpha$ = {alpha}')
-# # plt.savefig(f'plots/theta={str(theta).replace(".", "")}, pi={str(pi).replace(".", "")}.png', dpi=150)
-# plt.show()
-
-# %%
-u = res.x
-u
-
-# %%
-theta 
-
-# %%
-u = 0.99
-(pi * u) / (pi * u + (1 - pi) * F(u))
-
-# %%
-alpha * pi
+    plt.title(f'Expected FOR value, FDR control ({threshold})')
+    plt.legend()
+    plt.savefig(os.path.join('plots', f'FOR_theoretical_{threshold}.png'),
+        bbox_inches='tight', facecolor='w', dpi=300)
+    plt.savefig(os.path.join('plots', f'FOR_theoretical_{threshold}.pdf'),
+        bbox_inches='tight', facecolor='w')
+    plt.show()
 
 # %%
