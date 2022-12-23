@@ -128,7 +128,8 @@ def run_tests(metric_list, alpha_metrics, test_description, get_results_dir, bas
 
         for metric in metric_list + extra_mean_metrics:
             res_mean_df[metric] = round_and_multiply_metric(res_mean_df[metric], metric)
-            res_sem_df[metric] = round_and_multiply_metric(res_sem_df[metric], metric)
+            if metric != 'BFOR':
+                res_sem_df[metric] = round_and_multiply_metric(res_sem_df[metric], metric)
 
         res_mean_df = append_mean_row(res_mean_df)
         res_sem_df = append_mean_row(res_sem_df)
