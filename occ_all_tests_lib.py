@@ -583,16 +583,25 @@ def fill_nan_values(df, default_values=default_metric_values):
     return df
 
 # %%
-def aggregate_results(df, metric_list, alpha_metrics, RESULTS_DIR, DATASET_TYPE, alpha):
-    pivot_dict = {}
+import scipy.stats
+
+def aggregate_results(df: pd.DataFrame, metric_list, alpha_metrics, RESULTS_DIR, DATASET_TYPE, alpha):
+    mean_pivot_dict = {}
     for metric in metric_list:
         metric_df = df
         
-        pivot = metric_df \
-            .pivot_table(values=metric, index=['Dataset'], columns=['Method', 'Cutoff'], dropna=False)
+        mean_pivot = metric_df \
+            .pivot_table(
+                values=metric, index=['Dataset'], columns=['Method', 'Cutoff'], 
+                dropna=False)
+        sem_pivot = metric_df \
+            .pivot_table(
+                values=metric, index=['Dataset'], columns=['Method', 'Cutoff'],
+                dropna=False, aggfunc=scipy.stats.sem)
         
-        pivot_dict[metric] = pivot
-        process_pivot(metric, pivot, alpha_metrics, RESULTS_DIR, DATASET_TYPE, alpha)
+        mean_pivot_dict[metric] = mean_pivot
+        process_pivot(metric, mean_pivot, 'mean', alpha_metrics, RESULTS_DIR, DATASET_TYPE, alpha)
+        process_pivot(metric, sem_pivot, 'sem', alpha_metrics, RESULTS_DIR, DATASET_TYPE, alpha)
     
     # BFOR is special - it operates on means instead of specific values
     if 'FOR' in metric_list and '#FN' in metric_list and '#TN' in metric_list:
@@ -600,40 +609,40 @@ def aggregate_results(df, metric_list, alpha_metrics, RESULTS_DIR, DATASET_TYPE,
         if metric not in metric_list:
             metric_list.append('metric')
 
-        tn = pivot_dict['#TN']
-        fn = pivot_dict['#FN']
+        tn = mean_pivot_dict['#TN']
+        fn = mean_pivot_dict['#FN']
 
         BFOR_pivot = fn / (tn + fn)
         BFOR_pivot = BFOR_pivot.fillna(default_metric_values[metric])
-        pivot_dict[metric] = BFOR_pivot
+        mean_pivot_dict[metric] = BFOR_pivot
 
         if 'FOR' in alpha_metrics:
             alpha_metrics.append('BFOR')
 
-        process_pivot(metric, BFOR_pivot, alpha_metrics, RESULTS_DIR, DATASET_TYPE, alpha)
+        process_pivot(metric, BFOR_pivot, 'mean', alpha_metrics, RESULTS_DIR, DATASET_TYPE, alpha)
 
 
-def process_pivot(metric, pivot, alpha_metrics, RESULTS_DIR, DATASET_TYPE, alpha):
-    pivot = pivot.dropna(how='all')
-    pivot = append_mean_row(pivot)
-    pivot = round_and_multiply_metric(pivot, metric)
+def process_pivot(metric, mean_pivot, pivot_type, alpha_metrics, RESULTS_DIR, DATASET_TYPE, alpha):
+    mean_pivot = mean_pivot.dropna(how='all')
+    mean_pivot = append_mean_row(mean_pivot)
+    mean_pivot = round_and_multiply_metric(mean_pivot, metric)
 
-    pivot \
-        .to_csv(os.path.join(RESULTS_DIR, f'{DATASET_TYPE}-all-{metric}.csv'))
-    pivot \
+    mean_pivot \
+        .to_csv(os.path.join(RESULTS_DIR, f'{DATASET_TYPE}-all-{metric}-{pivot_type}.csv'))
+    mean_pivot \
         .transpose() \
-        .to_csv(os.path.join(RESULTS_DIR, f'{DATASET_TYPE}-all-{metric}-transposed.csv'))
+        .to_csv(os.path.join(RESULTS_DIR, f'{DATASET_TYPE}-all-{metric}-{pivot_type}-transposed.csv'))
 
-    if metric in alpha_metrics:
-        append_mean_row(pivot <= alpha) \
+    if pivot_type == 'mean' and metric in alpha_metrics:
+        append_mean_row(mean_pivot <= alpha) \
             .to_csv(os.path.join(RESULTS_DIR, f'{DATASET_TYPE}-all-{metric}-alpha.csv'))
-        append_mean_row(pivot <= alpha) \
+        append_mean_row(mean_pivot <= alpha) \
             .transpose() \
             .to_csv(os.path.join(RESULTS_DIR, f'{DATASET_TYPE}-all-{metric}-alpha-transposed.csv'))
         # 2 * alpha threshold
-        append_mean_row(pivot <= 2 * alpha) \
+        append_mean_row(mean_pivot <= 2 * alpha) \
             .to_csv(os.path.join(RESULTS_DIR, f'{DATASET_TYPE}-all-{metric}-2-alpha.csv'))
-        append_mean_row(pivot <= 2 * alpha) \
+        append_mean_row(mean_pivot <= 2 * alpha) \
             .transpose() \
             .to_csv(os.path.join(RESULTS_DIR, f'{DATASET_TYPE}-all-{metric}-2-alpha-transposed.csv'))
 

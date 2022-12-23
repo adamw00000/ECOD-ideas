@@ -4,12 +4,6 @@ import numpy as np
 import pandas as pd
 from occ_all_tests_lib import *
 
-test_type = 'fdr'
-DATASET_TYPE = 'BINARYdata'
-# DATASET_TYPE = 'SIMPLEtest'
-alpha = 0.1
-# alpha = 0.25
-
 RESULTS_ROOT = os.path.join(
     'results'
 )
