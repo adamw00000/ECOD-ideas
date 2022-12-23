@@ -14,7 +14,7 @@ alpha_metrics = ['FDR', 'FOR', 'FNR']
 test_description = 'FDR tests'
 get_results_dir = lambda dataset_type, alpha: f'results_{dataset_type}_fdr_{alpha:.2f}'
 
-baselines = [
+default_baselines = [
     'OracleLR',
     'OracleDT',
     'OracleRF',
@@ -45,5 +45,8 @@ pca_thresholds = [None, 1.0]
 def run_fdr_tests(DATASET_TYPE, get_all_distribution_configs, alpha, baselines_override=None):
     if baselines_override is not None:
         baselines = baselines_override
+    else:
+        baselines = default_baselines
+
     run_tests(metric_list, alpha_metrics, test_description, get_results_dir, baselines, get_cutoffs, pca_thresholds,
         DATASET_TYPE, get_all_distribution_configs, alpha, test_inliers_only=False, visualize_tests=True, apply_control_cutoffs=True)
