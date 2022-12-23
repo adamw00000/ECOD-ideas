@@ -494,14 +494,14 @@ def prepare_cutoff_plots(cutoff, test_case_name, clf_name, RESULTS_DIR):
     for_old_fig, for_old_axs = plt.subplots(1, 2, figsize=(24, 8))
     for_old_fig.suptitle(title)
 
-    for_gt_fig, for_gt_axs = plt.subplots(1, 2, figsize=(24, 8))
-    for_gt_fig.suptitle(title)
+    # for_gt_fig, for_gt_axs = plt.subplots(1, 2, figsize=(24, 8))
+    # for_gt_fig.suptitle(title)
 
-    for_geq_fig, for_geq_axs = plt.subplots(1, 2, figsize=(24, 8))
-    for_geq_fig.suptitle(title)
+    # for_geq_fig, for_geq_axs = plt.subplots(1, 2, figsize=(24, 8))
+    # for_geq_fig.suptitle(title)
 
-    for_geq_aeq_fig, for_geq_aeq_axs = plt.subplots(1, 2, figsize=(24, 8))
-    for_geq_aeq_fig.suptitle(title)
+    # for_geq_aeq_fig, for_geq_aeq_axs = plt.subplots(1, 2, figsize=(24, 8))
+    # for_geq_aeq_fig.suptitle(title)
 
     # fnr_fig, fnr_axs = plt.subplots(1, 2, figsize=(24, 8))
     # fnr_fig.suptitle(title)
@@ -514,9 +514,9 @@ def prepare_cutoff_plots(cutoff, test_case_name, clf_name, RESULTS_DIR):
         ((bh_fig, bh_axs[0, :]), False), 
         ((bh_fig, bh_axs[1, :]), True),
         ((for_old_fig, for_old_axs), True),
-        ((for_gt_fig, for_gt_axs), True),
-        ((for_geq_fig, for_geq_axs), True),
-        ((for_geq_aeq_fig, for_geq_aeq_axs), True),
+        # ((for_gt_fig, for_gt_axs), True),
+        # ((for_geq_fig, for_geq_axs), True),
+        # ((for_geq_aeq_fig, for_geq_aeq_axs), True),
         # ((fnr_fig, fnr_axs), True),
         # ((for_fnr_fig, for_fnr_axs), True),
     ]
