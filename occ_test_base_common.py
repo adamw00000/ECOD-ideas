@@ -8,7 +8,7 @@ import matplotlib.pyplot as plt
 from IPython.display import display
 from typing import List
 
-n_repeats = 10
+n_repeats = 20
 resampling_repeats = 10
 
 def run_tests(metric_list, alpha_metrics, test_description, get_results_dir, baselines, get_cutoffs, pca_thresholds,
