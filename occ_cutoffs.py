@@ -776,11 +776,11 @@ class PValueCutoff():
 class FORControlCutoffOld(PValueCutoff):
     @property
     def cutoff_type(self):
-        return 'FOR-CTL-old'
+        return 'FOR-CTL'
 
     @property
     def short_cutoff_type(self):
-        return 'FOR-CTL-old'
+        return 'FOR-CTL'
 
     def __init__(self, base_cutoff, alpha, pi):
         super().__init__(base_cutoff)
@@ -792,7 +792,7 @@ class FORControlCutoffOld(PValueCutoff):
         return [1 - ((1 - (i_array / N)) * (1 - self.alpha)) / (self.pi)]
 
     def _get_threshold_names(self):
-        return ['Old FOR threshold']
+        return ['FOR threshold']
 
     def _calculate_final_threshold(self, sorted_p_vals, minimal_thresholds):
         # min p(i): p(i) <= threshold
@@ -802,10 +802,6 @@ class FORControlCutoffOld(PValueCutoff):
             return sorted_p_vals[first_fulfillment_index]
         else:
             return np.inf
-
-    def apply_to_pvals(self, p_vals):
-        y_pred = np.where(p_vals < self.threshold_, 0, 1)
-        return y_pred
 
 
 class FORControlCutoffGreaterEqual(PValueCutoff):

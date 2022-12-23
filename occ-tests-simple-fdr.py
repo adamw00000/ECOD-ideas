@@ -4,7 +4,7 @@ from occ_test_base_fdr import run_fdr_tests
 
 DATASET_TYPE = 'SIMPLEtest'
 
-def sample_normal_simple(n, theta=2, inlier_rate=0.6):
+def sample_normal_simple(n, theta=2, inlier_rate=0.1):
     n_inliers = int(inlier_rate * n)
     n_outliers = n - n_inliers
 
@@ -27,13 +27,14 @@ def get_all_distribution_configs():
     ]:
         for num_samples in [1_000]:
             for theta in np.linspace(0, 5, 10 + 1):
-                test_case_name = f'{distribution} ({num_samples}, theta={theta:.1f})'
-                get_dataset_function = \
-                    lambda get_data=get_data, num_samples=num_samples, theta=theta: \
-                        get_data(num_samples, theta=theta)
+                for pi in [0.1]:
+                    test_case_name = f'{distribution} ({num_samples}, theta={theta:.1f}, pi={pi:.1f})'
+                    get_dataset_function = \
+                        lambda get_data=get_data, num_samples=num_samples, theta=theta: \
+                            get_data(num_samples, theta=theta, inlier_rate=pi)
 
-                all_configs.append((test_case_name, get_dataset_function))
-    
+                    all_configs.append((test_case_name, get_dataset_function))
+        
     return all_configs
 
 baselines_override = [
