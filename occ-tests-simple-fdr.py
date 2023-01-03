@@ -27,7 +27,7 @@ def get_all_distribution_configs():
     ]:
         for num_samples in [1_000]:
             for theta in np.linspace(0, 5, 10 + 1):
-                for pi in [0.1]:
+                for pi in [0.3]:
                     test_case_name = f'{distribution} ({num_samples}, theta={theta:.1f}, pi={pi:.1f})'
                     get_dataset_function = \
                         lambda get_data=get_data, num_samples=num_samples, theta=theta: \
