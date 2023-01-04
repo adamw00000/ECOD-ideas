@@ -25,7 +25,30 @@ for results_dir in os.listdir(RESULTS_ROOT):
             raw_results_file = file
             break
 
-    df = pd.read_csv(os.path.join(RESULTS_ROOT, results_dir, raw_results_file))
+    if raw_results_file is not None:
+        df = pd.read_csv(os.path.join(RESULTS_ROOT, results_dir, raw_results_file))
+    else:
+        df = pd.DataFrame()
+
+        for dataset_dir in os.listdir(os.path.join(RESULTS_ROOT, results_dir)):
+            if not os.path.isdir(os.path.join(RESULTS_ROOT, results_dir, dataset_dir))\
+                    or dataset_dir == 'global-plots':
+                continue
+
+            for file in os.listdir(os.path.join(RESULTS_ROOT, results_dir, dataset_dir)):
+                if 'raw' in file:
+                    raw_results_file = file
+                    break
+            if raw_results_file is None:
+                continue
+            else:
+                df = pd.concat([
+                    df,
+                    pd.read_csv(
+                        os.path.join(RESULTS_ROOT, results_dir, dataset_dir, raw_results_file)
+                    )
+                ])
+                raw_results_file = None
     
     metric_list = df.columns[4:]
     alpha_metrics = [m for m in metric_list if 'alpha' in m]
