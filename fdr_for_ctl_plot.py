@@ -126,11 +126,7 @@ def draw_plots(metric, cutoff_correction, alternative_metric):
         plt.show()
         plt.close(fig)
 
-draw_plots('FDR', f'BH+pi', 'FOR')
-
-draw_plots('FOR', 'FOR-CTL-old', 'FDR')
-draw_plots('FOR', 'FOR-CTL-gt', 'FDR')
-draw_plots('FOR', 'FOR-CTL-geq', 'FDR')
-draw_plots('FOR', 'FOR-CTL-geq-accept-eq', 'FDR')
+# draw_plots('FDR', f'BH+pi', 'FOR')
+draw_plots('FOR', 'FOR-CTL', 'FDR')
 
 # %%

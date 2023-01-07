@@ -658,7 +658,7 @@ class PValueCutoff():
     def visualize(self, X_test, y_test, figure, \
             test_case_name, clf_name, RESULTS_DIR, 
             zoom=False, zoom_left=True, save_plot=False):
-        assert self.is_fitted, 'Cutoff needs to be fitter first'
+        assert self.is_fitted, 'Cutoff needs to be fitted first'
         
         N = len(X_test)
 

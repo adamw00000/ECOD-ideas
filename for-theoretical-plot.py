@@ -7,20 +7,10 @@ import scipy.optimize
 import matplotlib.pyplot as plt
 import seaborn as sns
 
-# alpha = 0.05
-
-# theta = 0
-# pi = 0.5
-
-def F(q):
-    score = scipy.stats.norm.ppf(q)
-    return scipy.stats.norm.cdf(-score - theta)
-
-    # quantile = scipy.stats.norm.ppf(q)
-    # return scipy.stats.norm.cdf(quantile, loc=theta, scale=1)
-
-# def fun(u):
-#     return np.abs((pi * u) / (pi * u + (1 - pi) * F(u)) - alpha * pi)
+def F(u):
+    score = scipy.stats.norm.ppf(u)
+    # return 1 - scipy.stats.norm.cdf(-score - theta) # Assume IN ~ N(0, I), OUT ~ N(theta, I)
+    return scipy.stats.norm.cdf(score + theta) # Assume IN ~ N(0, I), OUT ~ N(-theta, I)
 
 def left(u):
     return (pi * u) / (pi * u + (1 - pi) * F(u))
@@ -42,6 +32,7 @@ for threshold in ['BH', 'BH+pi']:
         us = []
         fdrs = []
         fors = []
+
         for theta in np.linspace(0, 5, 21):
             if threshold == 'BH':
                 threshold_value = alpha * pi
