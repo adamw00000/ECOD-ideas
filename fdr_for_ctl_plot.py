@@ -35,6 +35,15 @@ metric_list = [m for m in metric_list if 'alpha' not in m]
 
 df
 
+if DATASET_TYPE == 'SIMPLEtest':
+    df = df.assign(
+        pi = df.Dataset.str.extract('pi=([^, \)]*)'),
+        theta = df.Dataset.str.extract('theta=([^, \)]*)'),
+    ) \
+        .sort_values(['pi', 'theta']) \
+        .drop(columns=['pi', 'theta'])
+
+
 # %%
 import matplotlib.pyplot as plt
 import seaborn as sns
@@ -53,7 +62,7 @@ def draw_plots(metric, cutoff_correction, alternative_metric):
         method_df = metric_df[metric_df.Method == method]
 
         nan_metric_string = f'Undefined {metric} ({"no rejections" if metric == "FDR" else "all rejected"})'
-        nan_alternative_string = f'Undefined {metric} ({"no rejections" if alternative_metric == "FDR" else "all rejected"})'
+        nan_alternative_string = f'Undefined {alternative_metric} ({"no rejections" if alternative_metric == "FDR" else "all rejected"})'
         normal_string = f'Defined {metric}'
         method_df = method_df.assign(
             IsNaN=np.where(np.isnan(method_df[metric]), nan_metric_string, normal_string),
@@ -65,6 +74,16 @@ def draw_plots(metric, cutoff_correction, alternative_metric):
             [[metric, alternative_metric]] \
             .mean() \
             .reset_index(drop=False)
+
+        if DATASET_TYPE == 'BINARYdata':
+            mean_df = mean_df.sort_values(metric)
+            dataset_order = { v: k for k, v in \
+                dict(mean_df.Dataset.reset_index(drop=True)).items()
+            }
+            method_df = method_df \
+                .assign(Order = method_df.Dataset.map(dataset_order)) \
+                .sort_values('Order') \
+                .drop(columns=['Order'])        
 
         datasets = df.Dataset.unique()
         fig, axs = plt.subplots(1, 2, figsize=(18, 8), sharey=True)
