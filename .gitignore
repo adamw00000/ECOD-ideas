@@ -2,6 +2,7 @@ __pycache__/
 *.csv
 data/
 occ-data/
+latex/
 *.png
 *.pdf
 *.zip
