@@ -432,20 +432,23 @@ class MultisplitCutoff(Cutoff):
         # for metric in ['Score', 'p-value']:
         for metric in ['p-value']:
             sns.set_theme()
-            _, axs = plt.subplots(1, 2, figsize=(14, 6), 
-                sharex=True, sharey=True)
+            # _, axs = plt.subplots(1, 2, figsize=(14, 6), 
+            #     sharex=True, sharey=True)
+            fig = plt.figure(figsize=(10, 8))
+            ax = plt.gca()
 
-            sns.histplot(train_df, x=metric, hue='Class', ax=axs[0],
-                hue_order=['Inlier'], stat='probability')
-            axs[0].set_title('Train')
-            sns.histplot(df, x=metric, hue='Class', ax=axs[1],
+            # sns.histplot(train_df, x=metric, hue='Class', ax=axs[0],
+            #     hue_order=['Inlier'], stat='probability')
+            # axs[0].set_title('Train')
+            sns.histplot(df, x=metric, hue='Class', ax=ax, 
+                edgecolor="k",
                 hue_order=['Inlier', 'Outlier'], stat='probability')
-            axs[1].set_title('Test')
+            # axs[1].set_title('Test')
             
-            plt.suptitle(f'{test_case_name} ({clf_name}, {self.cutoff_type}) - {metric} distribution')
+            # plt.suptitle(f'{test_case_name} ({clf_name}, {self.cutoff_type}) - {metric} distribution')
             plt.savefig(
                 os.path.join(RESULTS_DIR, test_case_name, 'img', f'distribution-{metric}-{clf_name}-{self.cutoff_type}.png'),
-                dpi=150,
+                dpi=600,
                 bbox_inches='tight',
                 facecolor='white',
             )
@@ -717,7 +720,7 @@ class PValueCutoff():
             hue=['Threshold'] * num_elements,
             palette=['r'],
             edgecolor=None,
-            s=3,
+            s=5,
             alpha=0.7,
             zorder=10,
             ax=ax)
@@ -750,8 +753,8 @@ class PValueCutoff():
             for h in legend.legendHandles[-num_threshold_markers + 1:]:
                 h._sizes = [4.]
 
-        ax.set_title(f'{self.cutoff_type}, alpha={self.alpha:.3f}' + \
-            f'{f" (zoomed)" if zoom else ""}')
+        # ax.set_title(f'{self.cutoff_type}, alpha={self.alpha:.3f}' + \
+        #     f'{f" (zoomed)" if zoom else ""}')
 
         if save_plot:
             os.makedirs(os.path.join(RESULTS_DIR, test_case_name, 'img'), exist_ok=True)
@@ -760,7 +763,7 @@ class PValueCutoff():
             fig.savefig(
                 os.path.join(RESULTS_DIR, test_case_name, 'img', 
                     f'cutoff-{clf_name}{base_cutoff_string}-{self.short_cutoff_type}.png'),
-                dpi=300,
+                dpi=600,
                 bbox_inches='tight',
                 facecolor='white',
             )

@@ -15,15 +15,15 @@ test_description = 'FDR tests'
 get_results_dir = lambda dataset_type, alpha: f'results_{dataset_type}_fdr_{alpha:.2f}'
 
 default_baselines = [
-    'OracleLR',
-    'OracleDT',
-    'OracleRF',
-    'A^3',
+    # 'OracleLR',
+    # 'OracleDT',
+    # 'OracleRF',
+    # 'A^3',
     # 'ECOD',
-    'ECODv2',
+    # 'ECODv2',
     # 'ECODv2Min',
     # 'GeomMedian',
-    'Mahalanobis',
+    # 'Mahalanobis',
     # 'OC-SVM',
     'IForest',
     # 'HBOS',

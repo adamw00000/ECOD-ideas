@@ -6,16 +6,11 @@ import binary_datasets
 DATASET_TYPE = 'BINARYdata'
 
 datasets = binary_datasets.full_dataset_list
-# datasets = [
-#     ('Abalone', 'csv'),
-#     ('Arrhythmia', 'csv'),
-#     ('Tic-tac-toe', 'csv'),
-#     ('Dermatology', 'csv'),
-#     ('Madelon', 'csv'),
-#     ('Banknote-authentication', 'csv'),
-#     ('Isolet', 'csv'),
-#     ('Fertility', 'csv'),
-# ]
+datasets = [
+    # ('Tic-tac-toe', 'csv'),
+    # ('Madelon', 'csv'),
+    ('Vehicle', 'csv'),
+]
 
 def get_all_dataset_configs(train_ratio=0.6):
     all_configs = []

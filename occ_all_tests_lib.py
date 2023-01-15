@@ -527,20 +527,30 @@ def draw_cutoff_plots(control_cutoff, X_test, y_test, common_visualization_param
     ((fig, axs), save_plot) = plot_info
     zoom_left = isinstance(control_cutoff, BenjaminiHochbergCutoff)
 
-    figure = (fig, axs[0])
+    plt.close(fig)
+
+    # figure = (fig, axs[0])
+    # zoom = False
+
+    sns.set_theme()
+    fig = plt.figure(figsize=(10, 8))
+    figure = (fig, plt.gca())
     zoom = False
+
     control_cutoff.visualize(X_test, y_test, figure, \
         **common_visualization_params, \
-        zoom=zoom, zoom_left=zoom_left, save_plot=False
+        zoom=zoom, zoom_left=zoom_left, 
+        # save_plot=False,
+        save_plot=True,
     )
 
-    figure = (fig, axs[1])
-    zoom = True
-    save_plot = save_plot
-    control_cutoff.visualize(X_test, y_test, figure, \
-        **common_visualization_params, \
-        zoom=zoom, zoom_left=zoom_left, save_plot=save_plot
-    )
+    # figure = (fig, axs[1])
+    # zoom = True
+    # save_plot = save_plot
+    # control_cutoff.visualize(X_test, y_test, figure, \
+    #     **common_visualization_params, \
+    #     zoom=zoom, zoom_left=zoom_left, save_plot=save_plot
+    # )
 
 # %%
 import pandas as pd

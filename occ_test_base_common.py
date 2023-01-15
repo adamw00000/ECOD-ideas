@@ -13,7 +13,7 @@ resampling_repeats = 10
 
 def run_tests(metric_list, alpha_metrics, test_description, get_results_dir, baselines, get_cutoffs, pca_thresholds,
         DATASET_TYPE, get_all_distribution_configs, alpha, test_inliers_only=False, visualize_tests=True, apply_control_cutoffs=True,
-        recalculate_existing_results=False):
+        recalculate_existing_results=True):
     full_results = []
 
     RESULTS_DIR = get_results_dir(DATASET_TYPE, alpha)
