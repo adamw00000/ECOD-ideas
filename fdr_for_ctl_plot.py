@@ -10,7 +10,7 @@ DATASET_TYPE = 'BINARYdata'
 alpha = 0.1
 # alpha = 0.25
 
-DIR = os.path.join('results', f'results_{DATASET_TYPE}_{test_type}_{alpha:.2f}')
+DIR = os.path.join('results-2023-01-07', f'results_{DATASET_TYPE}_{test_type}_{alpha:.2f}')
 
 df = pd.DataFrame()
 for d in os.listdir(os.path.join(DIR)):
@@ -43,6 +43,8 @@ if DATASET_TYPE == 'SIMPLEtest':
         .sort_values(['pi', 'theta']) \
         .drop(columns=['pi', 'theta'])
 
+df = df[~np.isin(df.Method, ['OracleLR', 'OracleRF', 'OracleDT'])]
+df
 
 # %%
 import matplotlib.pyplot as plt
@@ -58,7 +60,8 @@ def draw_plots(metric, cutoff_correction, alternative_metric):
     sns.set_theme()
     os.makedirs(os.path.join(DIR, 'global-plots'), exist_ok=True)
 
-    for method in metric_df.Method.unique():
+    # for method in metric_df.Method.unique():
+    for method in ['IForest']:
         method_df = metric_df[metric_df.Method == method]
 
         nan_metric_string = f'Undefined {metric} ({"no rejections" if metric == "FDR" else "all rejected"})'
@@ -122,24 +125,24 @@ def draw_plots(metric, cutoff_correction, alternative_metric):
             palette=['r'],
             zorder=100, 
             edgecolor='k',
-            s = 12,
+            s = 20,
             ax=axs[1],
         )
         axs[1].set_title(alternative_metric)
 
-        fig.suptitle(f'{method} - {controlling_cutoff} ({metric})')
+        # fig.suptitle(f'{method} - {controlling_cutoff} ({metric})')
         axs[0].set_xlim(-0.01, metric_df[metric].max() + 0.01)
         axs[1].set_xlim(-0.01, metric_df[alternative_metric].max() + 0.01)
 
         fig.tight_layout()
         plt.savefig(
-            os.path.join(DIR, 'global-plots', f'{cutoff_correction}-{method}.png'),
-            dpi=300,
+            os.path.join(DIR, 'global-plots', f'{cutoff_correction}-{alternative_metric}-{method}.png'),
+            dpi=600,
             bbox_inches='tight',
             facecolor='white',
         )
         plt.savefig(
-            os.path.join(DIR, 'global-plots', f'{cutoff_correction}-{method}.pdf'),
+            os.path.join(DIR, 'global-plots', f'{cutoff_correction}-{alternative_metric}-{method}.pdf'),
             bbox_inches='tight'
         )
         plt.show()
@@ -147,5 +150,61 @@ def draw_plots(metric, cutoff_correction, alternative_metric):
 
 # draw_plots('FDR', f'BH+pi', 'FOR')
 draw_plots('FOR', 'FOR-CTL', 'FDR')
+
+# %%
+sns.set_theme()
+
+dataset_order = { v: k for k, v in \
+    dict(df[(df.Method == 'IForest') & (df.Cutoff == 'Multisplit+FOR-CTL')]
+        .groupby('Dataset').mean().FOR.sort_values()
+        .reset_index(drop=False).Dataset.reset_index(drop=True)
+    ).items()
+}
+
+method_order = {
+    'IForest': 1,
+    'A^3': 2,
+    'Mahalanobis': 3,
+    'ECODv2': 4,
+    'ECODv2+PCA1.0': 5,
+}
+
+plot_df = df \
+    .assign(Order = df.Dataset.map(dataset_order)) \
+    .assign(MethodOrder = df.Method.map(method_order)) \
+    .sort_values(['Order', 'MethodOrder']) \
+    .drop(columns=['Order', 'MethodOrder']) \
+    [(df.Cutoff == 'Multisplit+FOR-CTL')]
+
+plot_df[plot_df.Method == 'ECODv2'].Method = 'ECOD'
+plot_df[plot_df.Method == 'ECODv2+PCA1.0'].Method = 'ECOD+PCA'
+
+fig, axs = plt.subplots(2, 1, figsize=(10, 14), sharey=True, sharex=True)
+sns.lineplot(data=plot_df, x='Dataset', y='FOR', 
+    # err_style='bars',
+    # ci=68,
+    hue='Method', style='Method',
+    ax=axs[0])
+axs[0].tick_params(rotation=90)
+
+sns.lineplot(data=plot_df, x='Dataset', y='FDR', 
+    # err_style='bars',
+    # ci=68,
+    hue='Method', style='Method',
+    ax=axs[1])
+axs[1].tick_params(rotation=90)
+
+plt.tight_layout()
+
+plt.savefig(
+    os.path.join('plots', f'FOR-FDR-v2.pdf'),
+    bbox_inches='tight'
+)
+plt.savefig(
+    os.path.join('plots', f'FOR-FDR-v2.png'),
+    dpi=600,
+    bbox_inches='tight'
+)
+plt.close(fig)
 
 # %%

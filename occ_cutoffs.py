@@ -349,7 +349,9 @@ class MultisplitCutoff(Cutoff):
         hue_order = ['Inlier', 'Outlier']
 
         sns.set_theme()
-        fig, axs = plt.subplots(2, 1, figsize=(16, 6), height_ratios=(3, 1), sharex=True)
+        # fig, axs = plt.subplots(2, 1, figsize=(16, 6), height_ratios=(3, 1), sharex=True)
+        fig = plt.figure(figsize=(16, 6))
+        ax = plt.gca()
 
         scatter_1 = sns.scatterplot(
             data=median_df,
@@ -359,43 +361,43 @@ class MultisplitCutoff(Cutoff):
             hue_order=hue_order,
             palette=[sns.color_palette()[0], sns.color_palette()[3]],
             zorder=100, s=12, edgecolor='k',
-            ax=axs[0],
+            ax=ax,
         )
-        scatter_2 = sns.scatterplot(
-            data=median_df,
-            x='Order',
-            y='Median p-value',
-            hue='Type',
-            hue_order=hue_order,
-            palette=[sns.color_palette()[0], sns.color_palette()[3]],
-            zorder=100, s=12, edgecolor='k',
-            ax=axs[1],
-        )
+        # scatter_2 = sns.scatterplot(
+        #     data=median_df,
+        #     x='Order',
+        #     y='Median p-value',
+        #     hue='Type',
+        #     hue_order=hue_order,
+        #     palette=[sns.color_palette()[0], sns.color_palette()[3]],
+        #     zorder=100, s=12, edgecolor='k',
+        #     ax=axs[1],
+        # )
         scatter_1.axhline(alpha, ls='--', c='k')
-        scatter_2.axhline(alpha, ls='--', c='k')
+        # scatter_2.axhline(alpha, ls='--', c='k')
 
-        axs[0].legend(title='Median values')
+        ax.legend(title='Median values')
         # axs[1].legend(title='Median values')
 
         sorted_df = df.merge(median_df, on=['Sample', 'Type']) \
             .sort_values('Order')
-        sns.stripplot(data=sorted_df, x='Order', y='p-value', linewidth=0.2, ax=axs[0])
-        sns.stripplot(data=sorted_df, x='Order', y='p-value', linewidth=0.2, ax=axs[1])
+        sns.stripplot(data=sorted_df, x='Order', y='p-value', linewidth=0.2, ax=ax)
+        # sns.stripplot(data=sorted_df, x='Order', y='p-value', linewidth=0.2, ax=axs[1])
 
-        axs[1].tick_params(axis='x', labelsize=6)
-        axs[1].set_xticks(sorted_df.Order, sorted_df.Sample)
-        axs[1].set_xlabel('Sample number')
+        ax.tick_params(axis='x', labelsize=6)
+        ax.set_xticks(sorted_df.Order, sorted_df.Sample)
+        ax.set_xlabel('Sample number')
 
-        axs[0].set_title(f'{self.cutoff_type} ({clf_name}) p-value lottery' + \
-            f' - max range length: {max_range:.3f}, mean: {mean_range:.3f}, median: {median_range:.3f}, range: ({mean_start:.3f}-{mean_end:.3f})')
-        axs[1].set_title(f'Zoomed')
+        # axs[0].set_title(f'{self.cutoff_type} ({clf_name}) p-value lottery' + \
+        #     f' - max range length: {max_range:.3f}, mean: {mean_range:.3f}, median: {median_range:.3f}, range: ({mean_start:.3f}-{mean_end:.3f})')
+        # axs[1].set_title(f'Zoomed')
 
-        axs[0].set_ylim(-0.005, 1 + 0.005)
-        axs[1].set_ylim(-0.005, alpha + 0.005)
+        ax.set_ylim(-0.005, 1 + 0.005)
+        # axs[1].set_ylim(-0.005, alpha + 0.005)
 
         plt.savefig(
             os.path.join(RESULTS_DIR, test_case_name, 'img', f'lottery-{clf_name}-{self.cutoff_type}.png'),
-            dpi=300,
+            dpi=600,
             bbox_inches='tight',
             facecolor='white',
         )
@@ -737,8 +739,8 @@ class PValueCutoff():
                     hue=[threshold_names[i]] * num_elements,
                     palette=[threshold_palette[i]],
                     edgecolor=None,
-                    s=0.75,
-                    alpha=0.7,
+                    s=1.25,
+                    alpha=0.8,
                     zorder=20,
                     ax=ax)
         

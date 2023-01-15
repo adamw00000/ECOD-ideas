@@ -31,12 +31,12 @@ default_baselines = [
 ]
 def get_cutoffs(construct_clf, alpha, resampling_repeats) -> List[Cutoff]:
     return [
-        EmpiricalCutoff(construct_clf),
+        # EmpiricalCutoff(construct_clf),
         # ChiSquaredCutoff(construct_clf, dim),
         # BootstrapThresholdCutoff(construct_clf, resampling_repeats),
         # MultisplitThresholdCutoff(construct_clf, resampling_repeats),
-        MultisplitCutoff(construct_clf, alpha, resampling_repeats=resampling_repeats, median_multiplier=2),
-        MultisplitCutoff(construct_clf, alpha, resampling_repeats=1, median_multiplier=1),
+        # MultisplitCutoff(construct_clf, alpha, resampling_repeats=resampling_repeats, median_multiplier=2),
+        # MultisplitCutoff(construct_clf, alpha, resampling_repeats=1, median_multiplier=1),
         MultisplitCutoff(construct_clf, alpha, resampling_repeats=resampling_repeats, median_multiplier=1),
         NoSplitCutoff(construct_clf, alpha),
     ]

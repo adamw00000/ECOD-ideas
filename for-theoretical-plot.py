@@ -56,10 +56,10 @@ for threshold in ['BH', 'BH+pi']:
     plt.xlabel('Distance between means $\\theta$')
     plt.ylabel('Expected FOR')
 
-    plt.title(f'Expected FOR value, FDR control ({threshold})')
+    # plt.title(f'Expected FOR value, FDR control ({threshold})')
     plt.legend()
     plt.savefig(os.path.join('plots', f'FOR_theoretical_{threshold}.png'),
-        bbox_inches='tight', facecolor='w', dpi=300)
+        bbox_inches='tight', facecolor='w', dpi=600)
     plt.savefig(os.path.join('plots', f'FOR_theoretical_{threshold}.pdf'),
         bbox_inches='tight', facecolor='w')
     plt.show()

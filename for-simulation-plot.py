@@ -102,10 +102,10 @@ for threshold in ['BH', 'BH+pi']:
     ax.set_xlabel('Distance between means $\\theta$')
     ax.set_ylabel('Simulated FOR')
 
-    ax.set_title(f'Simulated FOR value, FDR control ({threshold})')
+    # ax.set_title(f'Simulated FOR value, FDR control ({threshold})')
     ax.legend()
     fig.savefig(os.path.join('plots', f'FOR_simulation_{threshold}.png'),
-        bbox_inches='tight', facecolor='w', dpi=300)
+        bbox_inches='tight', facecolor='w', dpi=600)
     fig.savefig(os.path.join('plots', f'FOR_simulation_{threshold}.pdf'),
         bbox_inches='tight', facecolor='w')
     plt.show()
