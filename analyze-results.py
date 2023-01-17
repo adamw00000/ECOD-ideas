@@ -56,10 +56,11 @@ no_cutoff_row_cols = [method for method, c in metric_dfs['FOR'].columns]
 metric_dfs['FOR'].columns = no_cutoff_row_cols
 
 metric_dfs['FOR'] = metric_dfs['FOR'][['IForest', 'A^3', 'Mahalanobis', 'ECODv2', 'ECODv2+PCA1.0']] \
-    .rename(columns={'ECODv2': 'ECOD', 'ECODv2+PCA1.0': 'ECOD + PCA', 'A^3': '$A^3$'})
+    .rename(columns={'ECODv2': 'ECOD', 'ECODv2+PCA1.0': 'ECOD + PCA', 'A^3': '$\\bm{A^3}$'})
 
 metric_dfs['FOR'].index = '\\textit{' \
     + metric_dfs['FOR'].index.str.replace('\(csv\) ', '') \
+        .str.replace('authentication', 'auth') \
     + '}'
 metric_dfs['FOR'].columns = ['\\textbf{' + c + '}' for c in metric_dfs['FOR'].columns]
 metric_dfs['FOR'].columns.name = '\\textbf{Dataset}'

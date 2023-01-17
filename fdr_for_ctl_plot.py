@@ -170,27 +170,34 @@ method_order = {
 }
 
 plot_df = df \
+    .fillna(0) \
     .assign(Order = df.Dataset.map(dataset_order)) \
     .assign(MethodOrder = df.Method.map(method_order)) \
     .sort_values(['Order', 'MethodOrder']) \
     .drop(columns=['Order', 'MethodOrder']) \
     [(df.Cutoff == 'Multisplit+FOR-CTL')]
 
-plot_df[plot_df.Method == 'ECODv2'].Method = 'ECOD'
-plot_df[plot_df.Method == 'ECODv2+PCA1.0'].Method = 'ECOD+PCA'
+plot_df.loc[plot_df.Method == 'ECODv2', 'Method'] = 'ECOD'
+plot_df.loc[plot_df.Method == 'ECODv2+PCA1.0', 'Method'] = 'ECOD+PCA'
+plot_df.Dataset = plot_df.Dataset.str.replace('\(csv\) ', '') \
+    .str.replace('authentication', 'auth')
 
 fig, axs = plt.subplots(2, 1, figsize=(10, 14), sharey=True, sharex=True)
 sns.lineplot(data=plot_df, x='Dataset', y='FOR', 
     # err_style='bars',
     # ci=68,
-    hue='Method', style='Method',
+    err_style=None,
+    hue='Method', style='Method', markers=True,
+    markeredgecolor='k',
     ax=axs[0])
 axs[0].tick_params(rotation=90)
 
 sns.lineplot(data=plot_df, x='Dataset', y='FDR', 
     # err_style='bars',
     # ci=68,
-    hue='Method', style='Method',
+    err_style=None,
+    hue='Method', style='Method', markers=True,
+    markeredgecolor='k',
     ax=axs[1])
 axs[1].tick_params(rotation=90)
 
@@ -207,4 +214,6 @@ plt.savefig(
 )
 plt.close(fig)
 
+# %%
+plot_df[(plot_df.Method == 'ECOD') & (plot_df.Dataset == '(csv) Madelon')].FOR
 # %%
