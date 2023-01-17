@@ -408,6 +408,28 @@ class MultisplitCutoff(Cutoff):
         )
         plt.close(fig)
 
+    def gini(self, array):
+        """Calculate the Gini coefficient of a numpy array."""
+        # based on bottom eq:
+        # http://www.statsdirect.com/help/generatedimages/equations/equation154.svg
+        # from:
+        # http://www.statsdirect.com/help/default.htm#nonparametric_methods/gini.htm
+        # All values are treated equally, arrays must be 1d:
+        array = array.flatten()
+        if np.amin(array) < 0:
+            # Values cannot be negative:
+            array -= np.amin(array)
+        # Values cannot be 0:
+        array = array + 0.0000001
+        # Values must be sorted:
+        array = np.sort(array)
+        # Index per array element:
+        index = np.arange(1,array.shape[0]+1)
+        # Number of array elements:
+        n = array.shape[0]
+        # Gini coefficient:
+        return ((np.sum((2 * index - n  - 1) * array)) / (n * np.sum(array)))
+
     def visualize_p_values(self, visualization_data,
             test_case_name, clf_name, RESULTS_DIR):
         X_train, y_train, X_test, y_test = visualization_data
@@ -428,6 +450,38 @@ class MultisplitCutoff(Cutoff):
             'p-value': train_p_vals,
             'Class': np.array(['Inlier'] * len(train_p_vals))
         })
+
+        inliers_skew = scipy.stats.skew(p_vals[inlier_mask])
+        outliers_skew = scipy.stats.skew(p_vals[~inlier_mask])
+
+        inliers_kurt = scipy.stats.kurtosis(p_vals[inlier_mask])
+        outliers_kurt = scipy.stats.kurtosis(p_vals[~inlier_mask])
+
+        inliers_gini = self.gini(p_vals[inlier_mask])
+        outliers_gini = self.gini(p_vals[~inlier_mask])
+
+        os.makedirs(os.path.join(RESULTS_DIR, test_case_name), exist_ok=True)
+
+        pval_metrics = [
+            { 'Type': 'Inlier', 'Metric': 'Skewness', 'Value': inliers_skew },
+            { 'Type': 'Outlier', 'Metric': 'Skewness', 'Value': outliers_skew },
+            { 'Type': 'Inlier', 'Metric': 'Kurtosis', 'Value': inliers_kurt },
+            { 'Type': 'Outlier', 'Metric': 'Kurtosis', 'Value': outliers_kurt },
+            { 'Type': 'Inlier', 'Metric': 'Gini', 'Value': inliers_gini },
+            { 'Type': 'Outlier', 'Metric': 'Gini', 'Value': outliers_gini },
+        ]
+
+        if os.path.exists(os.path.join(RESULTS_DIR, test_case_name, 'pval_metrics.csv')):
+            metrics_df = pd.read_csv(os.path.join(RESULTS_DIR, test_case_name, 'pval_metrics.csv'))
+        else:
+            metrics_df = pd.DataFrame()
+
+        pd.concat([
+            metrics_df,
+            pd.DataFrame.from_records(pval_metrics),
+        ]).to_csv(
+            os.path.join(RESULTS_DIR, test_case_name, 'pval_metrics.csv'), index=False
+        )
 
         os.makedirs(os.path.join(RESULTS_DIR, test_case_name, 'img'), exist_ok=True)
 

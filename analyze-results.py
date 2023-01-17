@@ -78,6 +78,62 @@ with open(os.path.join('latex', 'for-table.tex'), 'w+') as f:
     )
 
 # %%
+skew_df = pd.DataFrame()
+
+for dataset in os.listdir(os.path.join('.', 'results_BINARYdata_fdr_0.10')):
+    dataset_dir = os.path.join('.', 'results_BINARYdata_fdr_0.10', dataset)
+    if not os.path.isdir(dataset_dir) or 'global' in dataset_dir:
+        continue
+
+    if os.path.exists(os.path.join(dataset_dir, 'pval_metrics.csv')):
+        df = pd.read_csv(os.path.join(dataset_dir, 'pval_metrics.csv'))
+        df = df[df.Metric == 'Skewness']
+        df = df.assign(Dataset=dataset)
+
+        skew_df = pd.concat([
+            skew_df,
+            df.pivot_table(values='Value', index='Dataset', columns=['Type'])
+        ])
+
+skew_df['SkewDiff'] = skew_df.Outlier - skew_df.Inlier
+display(skew_df)
+
+# %%
+raw_for_df = pd.read_csv(
+    os.path.join(
+        RESULTS_ROOT,
+        'results_BINARYdata_fdr_0.10',
+        f'BINARYdata-all-FOR-mean.csv'
+    ),
+    header=[0, 1],
+    index_col=[0]
+).iloc[:-1][('IForest', 'Multisplit+FOR-CTL')]
+raw_for_df
+
+# %%
+raw_df = pd.read_csv(
+    os.path.join(
+        RESULTS_ROOT,
+        'results_BINARYdata_fdr_0.10',
+        f'BINARYdata-raw-results.csv'
+    ),
+    # header=[0, 1],
+    # index_col=[0]
+)
+raw_for_df_v2 = raw_df[(raw_df.Method == 'IForest') & (raw_df.Cutoff == 'Multisplit+FOR-CTL')] \
+    .groupby('Dataset') \
+    .mean() \
+    .FOR
+
+# %%
+import matplotlib.pyplot as plt
+import seaborn as sns
+
+sns.set_theme()
+sns.scatterplot(x=skew_df['SkewDiff'], y=raw_for_df_v2[:len(skew_df['SkewDiff'])])
+# plt.plot(skew_df['SkewDiff'], raw_for_df[:len(skew_df['Outlier'])], '.')
+
+# %%
 dataset_order = metric_dfs['FOR'].index
 dataset_order
 
