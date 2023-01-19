@@ -102,10 +102,11 @@ def draw_plots(metric, cutoff_correction, alternative_metric):
             hue=['Mean value'] * len(mean_df),
             style=['Mean value'] * len(mean_df),
             markers=['X'],
-            palette=['r'],
+            palette=[sns.color_palette()[3]],
             zorder=100, 
             edgecolor='k',
-            s = 12,
+            s = 100,
+            alpha = 0.7,
             ax=axs[0],
         )
         axs[0].set_title(metric)
@@ -122,10 +123,11 @@ def draw_plots(metric, cutoff_correction, alternative_metric):
             hue=['Mean value'] * len(mean_df),
             style=['Mean value'] * len(mean_df),
             markers=['X'],
-            palette=['r'],
+            palette=[sns.color_palette()[3]],
             zorder=100, 
             edgecolor='k',
-            s = 20,
+            s = 100,
+            alpha = 0.7,
             ax=axs[1],
         )
         axs[1].set_title(alternative_metric)
@@ -156,6 +158,7 @@ sns.set_theme()
 
 dataset_order = { v: k for k, v in \
     dict(df[(df.Method == 'IForest') & (df.Cutoff == 'Multisplit+FOR-CTL')]
+        .fillna(0)
         .groupby('Dataset').mean().FOR.sort_values()
         .reset_index(drop=False).Dataset.reset_index(drop=True)
     ).items()
@@ -212,8 +215,70 @@ plt.savefig(
     dpi=600,
     bbox_inches='tight'
 )
+plt.show()
 plt.close(fig)
 
 # %%
-plot_df[(plot_df.Method == 'ECOD') & (plot_df.Dataset == '(csv) Madelon')].FOR
-# %%
+sns.set_theme()
+
+dataset_order = { v: k for k, v in \
+    dict(df[(df.Method == 'IForest') & (df.Cutoff == 'Multisplit+BH+pi')]
+        .fillna(0)
+        .groupby('Dataset').mean().FDR.sort_values()
+        .reset_index(drop=False).Dataset.reset_index(drop=True)
+    ).items()
+}
+
+method_order = {
+    'IForest': 1,
+    'A^3': 2,
+    'Mahalanobis': 3,
+    'ECODv2': 4,
+    'ECODv2+PCA1.0': 5,
+}
+
+plot_df = df \
+    .fillna(0) \
+    .assign(Order = df.Dataset.map(dataset_order)) \
+    .assign(MethodOrder = df.Method.map(method_order)) \
+    .sort_values(['Order', 'MethodOrder']) \
+    .drop(columns=['Order', 'MethodOrder']) \
+    [(df.Cutoff == 'Multisplit+BH+pi')]
+
+plot_df.loc[plot_df.Method == 'ECODv2', 'Method'] = 'ECOD'
+plot_df.loc[plot_df.Method == 'ECODv2+PCA1.0', 'Method'] = 'ECOD+PCA'
+plot_df.Dataset = plot_df.Dataset.str.replace('\(csv\) ', '') \
+    .str.replace('authentication', 'auth')
+
+fig, axs = plt.subplots(2, 1, figsize=(10, 14), sharey=True, sharex=True)
+sns.lineplot(data=plot_df, x='Dataset', y='FDR', 
+    # err_style='bars',
+    # ci=68,
+    err_style=None,
+    hue='Method', style='Method', markers=True,
+    markeredgecolor='k',
+    ax=axs[0])
+axs[0].tick_params(rotation=90)
+
+sns.lineplot(data=plot_df, x='Dataset', y='FOR', 
+    # err_style='bars',
+    # ci=68,
+    err_style=None,
+    hue='Method', style='Method', markers=True,
+    markeredgecolor='k',
+    ax=axs[1])
+axs[1].tick_params(rotation=90)
+
+plt.tight_layout()
+
+plt.savefig(
+    os.path.join('plots', f'BH-FOR-v2.pdf'),
+    bbox_inches='tight'
+)
+plt.savefig(
+    os.path.join('plots', f'BH-FOR-v2.png'),
+    dpi=600,
+    bbox_inches='tight'
+)
+plt.show()
+plt.close(fig)

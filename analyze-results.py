@@ -130,8 +130,18 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 
 sns.set_theme()
-sns.scatterplot(x=skew_df['SkewDiff'], y=raw_for_df_v2[:len(skew_df['SkewDiff'])])
+plt.figure(figsize=(10, 6))
+sns.scatterplot(x=skew_df['SkewDiff'], y=raw_for_df[:len(skew_df['SkewDiff'])],
+    edgecolor='k')
 # plt.plot(skew_df['SkewDiff'], raw_for_df[:len(skew_df['Outlier'])], '.')
+
+plt.xlabel('Skewness difference $I$')
+plt.ylabel('FOR')
+
+plt.savefig(os.path.join('plots', 'skew_vs_FOR.png'), dpi=600, bbox_inches='tight')
+plt.savefig(os.path.join('plots', 'skew_vs_FOR.pdf'), dpi=600, bbox_inches='tight')
+plt.show()
+plt.close()
 
 # %%
 dataset_order = metric_dfs['FOR'].index

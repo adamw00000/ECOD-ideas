@@ -8,9 +8,9 @@ DATASET_TYPE = 'BINARYdata'
 datasets = binary_datasets.full_dataset_list
 # datasets = [
 #     ('Ionosphere', 'csv'),
-#     # ('Tic-tac-toe', 'csv'),
-#     # ('Madelon', 'csv'),
-#     # ('Vehicle', 'csv'),
+#     ('Tic-tac-toe', 'csv'),
+#     ('Madelon', 'csv'),
+#     ('Vehicle', 'csv'),
 # ]
 
 def get_all_dataset_configs(train_ratio=0.6):
