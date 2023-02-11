@@ -534,8 +534,8 @@ def get_cutoff_predictions(cutoff, X_train, X_test, inlier_rate,
         inliers_kurt = scipy.stats.kurtosis(p_vals[inlier_mask])
         outliers_kurt = scipy.stats.kurtosis(p_vals[~inlier_mask])
 
-        inliers_gini = gini(p_vals[inlier_mask])
-        outliers_gini = gini(p_vals[~inlier_mask])
+        inliers_ks = scipy.stats.kstest(p_vals[inlier_mask], scipy.stats.uniform.cdf)
+        outliers_ks = scipy.stats.kstest(p_vals[~inlier_mask], scipy.stats.uniform.cdf)
 
         os.makedirs(os.path.join(RESULTS_DIR, test_case_name), exist_ok=True)
 
@@ -544,12 +544,14 @@ def get_cutoff_predictions(cutoff, X_train, X_test, inlier_rate,
             { 'Type': 'Outlier', 'Metric': 'Skewness', 'Value': outliers_skew },
             { 'Type': 'Inlier', 'Metric': 'Kurtosis', 'Value': inliers_kurt },
             { 'Type': 'Outlier', 'Metric': 'Kurtosis', 'Value': outliers_kurt },
-            { 'Type': 'Inlier', 'Metric': 'Gini', 'Value': inliers_gini },
-            { 'Type': 'Outlier', 'Metric': 'Gini', 'Value': outliers_gini },
+            { 'Type': 'Inlier', 'Metric': 'KSStat', 'Value': inliers_ks.statistic },
+            { 'Type': 'Outlier', 'Metric': 'KSStat', 'Value': outliers_ks.statistic },
+            { 'Type': 'Inlier', 'Metric': 'KSpVal', 'Value': inliers_ks.pvalue },
+            { 'Type': 'Outlier', 'Metric': 'KSpVal', 'Value': outliers_ks.pvalue },
         ]
 
-        if os.path.exists(os.path.join(RESULTS_DIR, test_case_name, 'pval_metrics.csv')):
-            metrics_df = pd.read_csv(os.path.join(RESULTS_DIR, test_case_name, 'pval_metrics.csv'))
+        if os.path.exists(os.path.join(RESULTS_DIR, test_case_name, 'pval_metrics_v2.csv')):
+            metrics_df = pd.read_csv(os.path.join(RESULTS_DIR, test_case_name, 'pval_metrics_v2.csv'))
         else:
             metrics_df = pd.DataFrame()
 
@@ -557,7 +559,7 @@ def get_cutoff_predictions(cutoff, X_train, X_test, inlier_rate,
             metrics_df,
             pd.DataFrame.from_records(pval_metrics),
         ]).to_csv(
-            os.path.join(RESULTS_DIR, test_case_name, 'pval_metrics.csv'), index=False
+            os.path.join(RESULTS_DIR, test_case_name, 'pval_metrics_v2.csv'), index=False
         )
 
     for cutoff_num, control_cutoff in enumerate([

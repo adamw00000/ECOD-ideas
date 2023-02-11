@@ -144,6 +144,56 @@ plt.show()
 plt.close()
 
 # %%
+ks_df = pd.DataFrame()
+
+for dataset in os.listdir(os.path.join('.', 'results_BINARYdata_fdr_0.10')):
+    dataset_dir = os.path.join('.', 'results_BINARYdata_fdr_0.10', dataset)
+    if not os.path.isdir(dataset_dir) or 'global' in dataset_dir:
+        continue
+
+    if os.path.exists(os.path.join(dataset_dir, 'pval_metrics_v2.csv')):
+        df = pd.read_csv(os.path.join(dataset_dir, 'pval_metrics_v2.csv'))
+        df = df[df.Metric == 'KSStat']
+        df = df.assign(Dataset=dataset)
+
+        ks_df = pd.concat([
+            ks_df,
+            df.pivot_table(values='Value', index='Dataset', columns=['Type'])
+        ])
+
+ks_df['KSStatDiff'] = ks_df.Outlier - ks_df.Inlier
+display(ks_df)
+
+# %%
+import matplotlib.pyplot as plt
+import seaborn as sns
+
+sns.set_theme()
+plt.figure(figsize=(10, 6))
+
+norm = plt.Normalize(ks_df['KSStatDiff'].min(), ks_df['KSStatDiff'].max())
+sm = plt.cm.ScalarMappable(norm=norm)
+sns.scatterplot(x=skew_df['SkewDiff'], y=raw_for_df[:len(ks_df)],
+    edgecolor='k', hue=ks_df['KSStatDiff'])
+plt.colorbar(sm)
+# plt.plot(skew_df['SkewDiff'], raw_for_df[:len(skew_df['Outlier'])], '.')
+
+# %%
+import matplotlib.pyplot as plt
+import seaborn as sns
+
+sns.set_theme()
+plt.figure(figsize=(10, 6))
+
+norm = plt.Normalize(ks_df['KSStatDiff'].min(), ks_df['KSStatDiff'].max())
+sm = plt.cm.ScalarMappable(norm=norm)
+sns.scatterplot(x=skew_df['SkewDiff'], y=raw_for_df[:len(skew_df['SkewDiff'])],
+    edgecolor='k', hue=ks_df['KSStatDiff'])
+plt.colorbar(sm)
+# plt.plot(skew_df['SkewDiff'], raw_for_df[:len(skew_df['Outlier'])], '.')
+
+
+# %%
 dataset_order = metric_dfs['FOR'].index
 dataset_order
 
