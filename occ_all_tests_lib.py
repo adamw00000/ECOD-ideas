@@ -563,8 +563,8 @@ def get_cutoff_predictions(cutoff, X_train, X_test, inlier_rate,
         )
 
     for cutoff_num, control_cutoff in enumerate([
-        BenjaminiHochbergCutoff(cutoff, alpha, None),
-        BenjaminiHochbergCutoff(cutoff, alpha, inlier_rate),
+        # BenjaminiHochbergCutoff(cutoff, alpha, None),
+        # BenjaminiHochbergCutoff(cutoff, alpha, inlier_rate),
         FORControlCutoffOld(cutoff, alpha, inlier_rate),
         # FORControlCutoffGreaterThan(cutoff, alpha, inlier_rate),
         # FORControlCutoffGreaterEqual(cutoff, alpha, inlier_rate),
@@ -601,8 +601,8 @@ def prepare_cutoff_plots(cutoff, test_case_name, clf_name, RESULTS_DIR):
     sns.set_theme()
     title = f'{test_case_name} - {clf_name}, {cutoff.cutoff_type}'
 
-    bh_fig, bh_axs = plt.subplots(2, 2, figsize=(24, 16))
-    bh_fig.suptitle(title)
+    # bh_fig, bh_axs = plt.subplots(2, 2, figsize=(24, 16))
+    # bh_fig.suptitle(title)
 
     for_old_fig, for_old_axs = plt.subplots(1, 2, figsize=(24, 8))
     for_old_fig.suptitle(title)
@@ -624,8 +624,8 @@ def prepare_cutoff_plots(cutoff, test_case_name, clf_name, RESULTS_DIR):
 
     plot_info = [
         # ((fig, axs), save_plot)
-        ((bh_fig, bh_axs[0, :]), False),
-        ((bh_fig, bh_axs[1, :]), True),
+        # ((bh_fig, bh_axs[0, :]), False),
+        # ((bh_fig, bh_axs[1, :]), True),
         ((for_old_fig, for_old_axs), True),
         # ((for_gt_fig, for_gt_axs), True),
         # ((for_geq_fig, for_geq_axs), True),
